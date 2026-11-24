@@ -1,0 +1,750 @@
+<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<title>片段阅读 · 考场模式</title>
+<style>
+:root{--bg:#0e1116;--panel:#151a21;--line:#242c36;--fg:#e6e9ee;--sub:#9aa4b2;--acc:#4c8dff;--ok:#2ea043;--bad:#f85149;--warn:#d29922}
+*{box-sizing:border-box}
+html,body{overflow-x:hidden}
+body{margin:0;min-height:100dvh;background:var(--bg);color:var(--fg);font:15px/1.65 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-text-size-adjust:100%}
+.wrap{max-width:760px;margin:0 auto;padding:18px 16px 90px}
+.hd{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+h1{font-size:18px;margin:0 0 4px}
+.sub{color:var(--sub);font-size:12px}
+.hd-r{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-size:13px;color:var(--sub);flex:0 0 auto}
+#timer{font-variant-numeric:tabular-nums;color:var(--fg);font-weight:600}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}
+.passage{font-size:16px;line-height:2;letter-spacing:.3px;text-align:justify;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+.passage .s,.struct .s{cursor:pointer}
+.passage .s.mark,.struct .s.mark{text-decoration:underline;text-decoration-color:var(--acc);text-decoration-thickness:2px;text-underline-offset:4px;background:rgba(76,141,255,.08);border-radius:2px}
+.passage .s.del,.struct .s.del{color:#6b7686;text-decoration:line-through;text-decoration-thickness:1px;background:transparent}
+.passage .s.del mark,.struct .s.del mark{background:transparent;color:inherit}
+.tools{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.stats .row{display:flex;gap:10px;align-items:baseline;font-size:13px;margin:7px 0;flex-wrap:wrap}
+.stats .k{color:var(--sub);width:52px;flex:0 0 auto}
+.stats .v{font-weight:600}
+.stats .w{color:var(--sub);font-size:12px}
+.stats .w.bad{color:var(--bad)}
+.qchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.qchip{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:8px;border:1px solid var(--line);font-size:12px;color:var(--sub);text-decoration:none}
+.qchip b{font-weight:700}
+.qchip .ok{color:var(--ok)}
+.qchip .bad{color:var(--bad)}
+.qchip.ans-ok{border-color:rgba(46,160,67,.45)}
+.qchip.ans-bad{border-color:rgba(248,81,73,.45)}
+#result.foldmode .passage .s.del,#result.foldmode .struct .s.del{display:none}
+#foldBtn,#skelBtn{background:transparent;border:1px solid var(--line);color:var(--sub);font-size:12px;padding:6px 10px;border-radius:8px;margin-top:12px;cursor:pointer}
+#foldBtn:hover,#skelBtn:hover{border-color:var(--acc);color:var(--fg)}
+.stem{margin-top:14px;color:var(--sub);font-size:14px}
+.opts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.opt{display:flex;gap:9px;align-items:flex-start;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:#131922;cursor:pointer;font-size:15px;line-height:1.6;transition:.1s}
+.opt:hover{border-color:#3a4655}
+.opt .k{color:var(--sub);font-weight:700;flex:0 0 auto}
+.opt.on{border-color:var(--acc);background:#16233a}
+.opt.on .k{color:var(--acc)}
+.opt.correct{border-color:var(--ok);background:rgba(46,160,67,.12)}
+.opt.wrong{border-color:var(--bad);background:rgba(248,81,73,.12)}
+.mk{font-size:11px;margin-left:auto;white-space:nowrap;align-self:center}
+.mk.ok{color:var(--ok)} .mk.bad{color:var(--bad)}
+.tip{color:var(--sub);font-size:11.5px;margin-top:12px;transition:opacity .3s}
+.bar2{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px}
+button{background:var(--panel);border:1px solid var(--line);color:var(--fg);padding:10px 16px;border-radius:9px;font-size:14px;cursor:pointer}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+.cnt{color:var(--sub);font-size:12.5px}
+.ctl{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:0 0 auto}
+.sg{background:transparent;border:0;border-radius:0;padding:7px 13px;font-size:12.5px;color:var(--sub);cursor:pointer}
+.sg.on{background:var(--acc);color:#fff;font-weight:600}
+.dres{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+.dres-hd{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--sub);margin-bottom:8px}
+.dres-hd .ok{color:var(--ok);font-weight:700}
+.dres-hd .bad{color:var(--bad);font-weight:700}
+.dres-hd .src{opacity:.75}
+.sum{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.big{font-size:36px;font-weight:800;letter-spacing:1px}
+.sum-r{color:var(--sub);font-size:13px;line-height:1.8}
+.rev{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}
+.rev-hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--sub);margin-bottom:10px}
+.rev-hd .ok{color:var(--ok);font-weight:700}
+.rev-hd .bad{color:var(--bad);font-weight:700}
+.rev-hd .src{opacity:.75}
+.passage .s.main,.struct .s.main{background:rgba(210,153,34,.2);box-shadow:inset 0 -2px 0 var(--warn)}
+.passage .s.mine,.struct .s.mine{text-decoration:underline;text-decoration-color:var(--acc);text-decoration-thickness:2px;text-underline-offset:4px}
+.struct{margin-top:2px}
+.struct-hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--sub);margin-bottom:2px}
+.struct-sum{color:var(--acc);font-weight:600;letter-spacing:.5px}
+.srow{display:grid;grid-template-columns:minmax(0,1fr) 208px;gap:14px;padding:8px 0;border-top:1px dashed rgba(255,255,255,.07)}
+.srow:first-of-type{border-top:0}
+.stxt{font-size:16px;line-height:1.9;text-align:justify}
+.sann{position:relative;padding-left:12px;font-size:12px;line-height:1.6;color:var(--sub);align-self:start;margin-top:5px}
+.sann:before{content:'';position:absolute;left:0;top:3px;bottom:3px;width:2px;border-radius:2px;background:var(--line)}
+.sann:after{content:'';position:absolute;left:-14px;top:9px;width:12px;height:1px;background:var(--line)}
+.srow.smain .sann:before{background:var(--warn)}
+.tag{display:inline-block;padding:1px 7px;border-radius:5px;font-size:11px;font-weight:600;margin-right:6px;vertical-align:1px;white-space:nowrap}
+.t-bg{background:rgba(139,152,169,.18);color:#aab6c6}
+.t-prob{background:rgba(248,81,73,.16);color:#ff7b72}
+.t-turn{background:rgba(210,153,34,.18);color:#e3b341}
+.t-eg{background:rgba(125,133,144,.2);color:#9aa4b2}
+.t-cause{background:rgba(163,113,247,.18);color:#b692f6}
+.t-fix{background:rgba(63,185,80,.16);color:#56d364}
+.t-conc{background:rgba(210,153,34,.22);color:#e3b341}
+.t-main{background:rgba(255,196,0,.26);color:#ffe066}
+.t-par{background:rgba(57,197,207,.16);color:#56d4dd}
+.t-def{background:rgba(76,141,255,.16);color:#79b0ff}
+.t-note{background:rgba(139,152,169,.14);color:#9aa4b2}
+#result.foldmode .srow.hasdel{display:none}
+#result.skeleton .srow[data-role="背景"],#result.skeleton .srow[data-role="说明"],#result.skeleton .srow[data-role="举例"],#result.skeleton .srow[data-role="补充"],#result.skeleton .srow[data-role="定义"],#result.skeleton .srow[data-role="引用"]{display:none}
+.und{margin-top:12px;font-size:12.5px;color:var(--warn)}
+.und.ok{color:var(--ok)}
+.ana{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);color:var(--sub);font-size:13.5px;line-height:1.9;white-space:pre-wrap}
+.src2{margin-top:10px;font-size:11px;color:#6b7686}
+.fixbtn{background:transparent;border:1px solid var(--line);color:var(--sub);font-size:11px;padding:2px 8px;border-radius:6px;margin-left:8px;cursor:pointer}
+.fixbtn:hover{border-color:var(--acc);color:var(--fg)}
+select{background:var(--panel);border:1px solid var(--line);color:var(--fg);padding:9px 10px;border-radius:9px;font-size:13px}
+@media (max-width:560px){
+  .wrap{padding:14px 13px 80px}
+  .passage{font-size:16px;line-height:1.95}
+  h1{font-size:16.5px}
+  .big{font-size:30px}
+  .srow{grid-template-columns:1fr;gap:1px;padding:7px 0}
+  .sann{margin-top:1px;padding-left:10px;font-size:11.5px}
+  .sann:before{top:1px;bottom:1px}
+  .sann:after{display:none}
+  .stxt{font-size:15.5px;line-height:1.85}
+}
+</style>
+</head><body>
+<div class="wrap">
+  <div class="hd">
+    <div>
+      <h1>片段阅读 · 训练</h1>
+      <div class="sub" id="sub">正在加载…</div>
+    </div>
+    <div class="hd-r"><span id="progress"></span><span id="timer">00:00</span></div>
+  </div>
+
+  <div class="ctl">
+    <div class="seg" id="modeSeg">
+      <button class="sg on" data-mode="exam">考场模式</button>
+      <button class="sg" data-mode="drill">刷题模式</button>
+    </div>
+    <select id="typeSel">
+      <option value="all">全部题型</option>
+      <option value="主旨概括">主旨概括</option>
+      <option value="意图判断">意图判断</option>
+      <option value="标题填入">标题填入</option>
+    </select>
+    <select id="scopeSel" title="题库范围">
+      <option value="main">有主旨标注</option>
+      <option value="all">全部题目</option>
+    </select>
+  </div>
+
+  <div id="quiz">
+    <div class="card">
+      <div class="tools">
+        <span class="tip" id="tip" style="margin:0">单击划重点 · 双击划掉不读</span>
+      </div>
+      <div class="passage" id="passage"></div>
+      <div class="stem" id="stem"></div>
+      <div class="opts" id="opts"></div>
+    </div>
+    <div class="bar2">
+      <span class="cnt" id="cnt">未作答</span>
+      <span style="flex:1"></span>
+      <button id="skip" style="display:none">不会，看解析</button>
+      <button id="next" class="primary">下一题</button>
+    </div>
+  </div>
+
+  <div id="result" style="display:none"></div>
+</div>
+<script>
+var MODE='exam', TYPE='all', SCOPE='main';
+var QS=[], IDX=0, ANS=[], UND=[], DEL=[], TMS=[], T0=0, TICK=null;
+var LETTER='ABCDEFGH';
+var D={qs:[],i:0,done:0,right:0,streak:0,revealed:false};
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function fmtTime(ms){var s=Math.max(0,Math.floor(ms/1000));var m=Math.floor(s/60);s=s%60;return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;}
+
+var PACKS={}, MANIFEST=null, POOL={}, SEEN={};
+var SCOPE='main';
+function loadManifest(){
+  if(MANIFEST) return Promise.resolve(MANIFEST);
+  return fetch('data/manifest.json').then(function(r){return r.json();}).then(function(m){MANIFEST=m;return m;});
+}
+function loadPack(scope,i){
+  var key=scope+':'+i;
+  if(PACKS[key]) return Promise.resolve(PACKS[key]);
+  return fetch('data/'+scope+'/pack-'+i+'.json').then(function(r){return r.json();}).then(function(list){PACKS[key]=list;return list;});
+}
+function shuffle(a){
+  for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}
+  return a;
+}
+function norm(q){
+  return {id:q.id,type:q.type,stem:q.stem,sentences:q.s,options:q.o,answerIndex:q.a,analysis:q.an,mainIndex:q.m,mainSource:q.src,structure:q.st,paper:q.p};
+}
+function loadPool(scope){
+  if(POOL[scope]) return Promise.resolve(POOL[scope]);
+  return loadManifest().then(function(m){
+    var tiers=scope==='all'?['main','more']:['main'];
+    var jobs=[];
+    for(var ti=0;ti<tiers.length;ti++){
+      var tier=tiers[ti];
+      var part=m[tier]||{count:0};
+      for(var i=0;i<part.count;i++) jobs.push(loadPack(tier,i));
+    }
+    return Promise.all(jobs).then(function(lists){
+      var pool=[];
+      for(var k=0;k<lists.length;k++) pool=pool.concat(lists[k]);
+      POOL[scope]=pool;
+      return pool;
+    });
+  });
+}
+function takeQuestions(n,type){
+  return loadPool(SCOPE).then(function(pool){
+    var match=function(q){return type==='all'||q.type===type;};
+    var key=function(q){return SCOPE+':'+q.id;};
+    var fresh=pool.filter(function(q){return match(q)&&!SEEN[key(q)];});
+    if(fresh.length<n){ SEEN={}; fresh=pool.filter(match); }
+    var picked=shuffle(fresh.slice()).slice(0,n).map(norm);
+    for(var i=0;i<picked.length;i++) SEEN[key(picked[i])]=1;
+    return picked;
+  });
+}
+function fetchQuiz(n){
+  return takeQuestions(n, TYPE);
+}
+
+function optsHtml(q, ans, reveal){
+  return q.options.map(function(t,j){
+    var c='opt'+(reveal&&j===q.answerIndex?' correct':'')+(reveal&&j===ans&&j!==q.answerIndex?' wrong':'');
+    var mk=reveal?(j===q.answerIndex?'<span class="mk ok">✓ 正确答案</span>':(j===ans?'<span class="mk bad">✗ 你选的</span>':'')):'';
+    return '<div class="'+c+'" data-i="'+j+'"><span class="k">'+LETTER[j]+'.</span><span>'+esc(t)+'</span>'+mk+'</div>';
+  }).join('');
+}
+
+var ROLE_RULES=[
+  ['结论',/因此|所以|可见|总之|综上|由此可见|这说明|这意味着|换言之|简而言之|说到底/],
+  ['对策',/应当|应该|必须|亟需|亟待|唯有|只有.{0,30}才|关键在于|重要的是|建议|措施|对策|途径/],
+  ['转折',/但是|然而|不过|却|其实|事实上|相反|(?<!不)但/],
+  ['举例',/例如|比如|譬如|如：|诸如|以.{0,12}为例/],
+  ['原因',/因为|由于|原因|之所以/],
+  ['并列',/同时|此外|另外|另一方面|与此同时|进而|甚至/],
+  ['引用',/有人说|专家|研究表明|调查显示|数据显示|据统计/],
+  ['问题',/问题|困境|不足|缺乏|难以|弊端|隐忧|挑战/],
+  ['背景',/随着|近年来|长期以来|一直以来|在.{0,12}背景下|人们通常|传统上|过去/],
+  ['定义',/是指|所谓|指的是/]
+];
+var ROLE_CLS={背景:'bg',问题:'prob',转折:'turn',举例:'eg',原因:'cause',对策:'fix',结论:'conc',并列:'par',引用:'note',定义:'def',说明:'note',主旨:'main',补充:'note'};
+var ROLE_NOTE={背景:'交代背景，引出话题',问题:'指出问题或不足',转折:'转折，引出重点',举例:'举例论证',原因:'分析原因',对策:'提出对策',结论:'得出结论',并列:'并列展开',引用:'引用观点或数据',定义:'解释概念',说明:'具体说明',补充:'补充说明',主旨:'本段主旨所在'};
+var CN_NUM2={'一':0,'二':1,'三':2,'四':3,'五':4,'六':5,'七':6,'八':7,'九':8,'十':9};
+
+function roleOf(s){
+  for(var i=0;i<ROLE_RULES.length;i++) if(ROLE_RULES[i][1].test(s)) return ROLE_RULES[i][0];
+  return '说明';
+}
+
+function analysisNotes(a,n){
+  var out=[]; for(var i=0;i<n;i++) out.push('');
+  var parts=String(a||'').split(/[。；\n]/).filter(Boolean);
+  for(var k=0;k<parts.length;k++){
+    var p=parts[k], idx=-1;
+    if(/[A-D]项|选项|排除|无中生有|未提及|表述(?:正确|错误)|不符|当选/.test(p)) continue;
+    var m=p.match(/第([一二三四五六七八九十])句/);
+    if(m) idx=CN_NUM2[m[1]];
+    else if(/首句|第一句|开篇|文段开头/.test(p)) idx=0;
+    else if(/尾句|最后一句|末句|结尾句|最后/.test(p)) idx=n-1;
+    if(idx<0||idx>=n||out[idx]) continue;
+    var t=p.replace(/^[\s\S]*?(第[一二三四五六七八九十]句|首句|第一句|开篇|文段开头|尾句|最后一句|末句|结尾句|最后)/,'');
+    t=t.replace(/^(指出|说明|强调|提出|介绍|论述|分析|解释|表明|点明|总结|引出|讲到|讲|说)(?:了)?[，,、：:]?/,'');
+    t=t.replace(/^[，,、：:。\s]+/,'');
+    if(t.length>=5) out[idx]=t.length>50?t.slice(0,50)+'…':t;
+  }
+  return out;
+}
+
+function roleOfSentence(q,i,note){
+  if(i===q.mainIndex) return '主旨';
+  var r=roleOf(q.sentences[i]);
+  if(r!=='说明') return r;
+  if(note){
+    if(/举例|例子|以.{0,10}为例/.test(note)) return '举例';
+    if(/对策|建议|措施/.test(note)) return '对策';
+    if(/问题|不足|困境|弊端/.test(note)) return '问题';
+    if(/原因|因为|由于/.test(note)) return '原因';
+    if(/结论|总结|总之/.test(note)) return '结论';
+    if(/背景|话题|现状|引出/.test(note)) return '背景';
+  }
+  if(i===0) return '背景';
+  if(i===q.sentences.length-1) return '补充';
+  return '说明';
+}
+
+function mainNote(a){
+  var m=String(a||'').match(/(?:重在|重点|旨在|意在|主要)(?:强调|说明|介绍|论述|表明|讲述|讨论)?[，,：:]?(.{6,90})/);
+  if(!m) return '';
+  var t=m[1].replace(/^[，,]?\s*(?:对应|故选|因此选|故选择)?\s*[A-D]项[，,：:]?/,'');
+  t=t.replace(/[，,](?:对应|故选|因此选)?\s*[A-D]项[\s\S]*$/,'').replace(/[，,]?故正确答案[\s\S]*$/,'').trim();
+  t=t.replace(/^[，,：:。\s]+/,'');
+  if(t.length<5) return '';
+  return t.length>50?t.slice(0,50)+'…':t;
+}
+
+function structHtml(q,und,del){
+  del=del||[];
+  var n=q.sentences.length;
+  var notes=analysisNotes(q.analysis||'',n);
+  var roles=[];
+  for(var i=0;i<n;i++) roles.push(roleOfSentence(q,i,notes[i]));
+  var rows='';
+  for(var j=0;j<n;j++){
+    var isMain=j===q.mainIndex;
+    var cls='s'+(isMain?' main':'')+(j===und?' mine':'')+(del.indexOf(j)>=0?' del':'');
+    var note=(isMain?mainNote(q.analysis):'')||notes[j]||ROLE_NOTE[roles[j]]||'';
+    rows+='<div class="srow'+(isMain?' smain':'')+(del.indexOf(j)>=0?' hasdel':'')+'" data-role="'+roles[j]+'">'+
+      '<div class="stxt"><span class="'+cls+'" data-i="'+j+'">'+esc(q.sentences[j])+'</span></div>'+
+      '<div class="sann"><span class="tag t-'+ROLE_CLS[roles[j]]+'">'+roles[j]+'</span>'+(note?'<span class="snote">'+esc(note)+'</span>':'')+'</div>'+
+      '</div>';
+  }
+  return '<div class="struct"><div class="struct-hd"><span>逐句结构</span><span class="struct-sum">'+esc(roles.join(' → '))+'</span>'+(q.structure?'<span class="struct-st">结构：'+esc(q.structure)+'</span>':'')+'</div>'+rows+'</div>';
+}
+
+function marksHtml(q, und, del){
+  del=del||[];
+  var h;
+  if(q.mainIndex==null) h=und==null?'<div class="und">本题解析未给主旨句位置</div>':'<div class="und">你划的是第 '+(und+1)+' 句 · 本题无主旨句标注</div>';
+  else if(und==null) h='<div class="und">本题没有划线</div>';
+  else if(und===q.mainIndex) h='<div class="und ok">划线正确</div>';
+  else h='<div class="und">你划的是第 '+(und+1)+' 句，主旨句在第 '+(q.mainIndex+1)+' 句</div>';
+  if(del.length){
+    var hurt=q.mainIndex!=null && del.indexOf(q.mainIndex)>=0;
+    h+='<div class="und'+(hurt?'':' ok')+'">划掉 '+del.length+' 句'+(hurt?' · ⚠ 其中包含主旨句':'')+'</div>';
+  }
+  return h;
+}
+
+function renderSentences(q, und, del, reveal){
+  document.getElementById('passage').innerHTML=q.sentences.map(function(s,i){
+    var cls='s'+(reveal&&i===q.mainIndex?' main':'')+(i===und?' mark':'')+((del||[]).indexOf(i)>=0?' del':'');
+    return '<span class="'+cls+'" data-i="'+i+'">'+esc(s)+'</span>';
+  }).join('');
+}
+
+function renderQuestion(q, und, del, reveal){
+  renderSentences(q, und, del, reveal);
+  document.getElementById('stem').textContent=q.stem||'这段文字主要说明：';
+  document.getElementById('opts').innerHTML=optsHtml(q, null, reveal);
+}
+
+function start(){
+  document.getElementById('result').style.display='none';
+  document.getElementById('quiz').style.display='';
+  document.getElementById('sub').textContent='正在出题…';
+  document.getElementById('progress').textContent='';
+  document.getElementById('next').style.display='';
+  document.getElementById('skip').style.display='none';
+  fetchQuiz(5)
+    .then(function(qs){
+      QS=qs;
+      if(!QS.length){ document.getElementById('sub').textContent='没抽到题，换个题型试试'; return; }
+      IDX=0;
+      ANS=QS.map(function(){return null;});
+      UND=QS.map(function(){return null;});
+      DEL=QS.map(function(){return [];});
+      TMS=QS.map(function(){return 0;});
+      document.getElementById('sub').textContent='考场模式 · 连续排版 · 交卷后统一解析';
+      show();
+    })
+    .catch(function(e){ document.getElementById('sub').textContent='出题失败：'+e.message; });
+}
+
+function show(){
+  var q=QS[IDX];
+  document.getElementById('progress').textContent=(IDX+1)+' / '+QS.length;
+  renderQuestion(q, UND[IDX], DEL[IDX], false);
+  document.getElementById('tip').style.opacity='1';
+  lastTap=null;
+  paint();
+  var btn=document.getElementById('next');
+  btn.style.display='';
+  btn.textContent=(IDX===QS.length-1)?'交卷':'下一题';
+  T0=Date.now();
+  clearInterval(TICK);
+  TICK=setInterval(function(){document.getElementById('timer').textContent=fmtTime(Date.now()-T0);},250);
+  window.scrollTo(0,0);
+}
+
+/* ---------------- 刷题模式 ---------------- */
+
+function drillStart(){
+  D.done=0; D.right=0; D.streak=0;
+  document.getElementById('result').style.display='none';
+  document.getElementById('quiz').style.display='';
+  document.getElementById('sub').textContent='正在出题…';
+  document.getElementById('progress').textContent='';
+  document.getElementById('next').style.display='none';
+  document.getElementById('skip').style.display='none';
+  fetchQuiz(10)
+    .then(function(qs){
+      if(!qs.length){ document.getElementById('sub').textContent='没抽到题，换个题型试试'; return; }
+      D.qs=qs; D.i=0;
+      drillShow();
+    })
+    .catch(function(e){ document.getElementById('sub').textContent='出题失败：'+e.message; });
+}
+
+function drillShow(){
+  var q=D.qs[D.i];
+  QS=[q]; IDX=0; ANS=[null]; UND=[null]; DEL=[[]];
+  D.revealed=false;
+  document.getElementById('progress').textContent='第 '+(D.done+1)+' 题';
+  document.getElementById('sub').textContent='刷题模式 · 已做 '+D.done+' · 对 '+D.right+(D.streak>1?' · 连对 '+D.streak:'');
+  renderQuestion(q, null, [], false);
+  document.getElementById('tip').style.opacity='1';
+  lastTap=null;
+  paint();
+  var old=document.getElementById('drillRes');
+  if(old) old.parentNode.removeChild(old);
+  var btn=document.getElementById('next');
+  btn.style.display='none';
+  btn.textContent='下一题';
+  document.getElementById('skip').style.display='';
+  T0=Date.now();
+  clearInterval(TICK);
+  TICK=setInterval(function(){document.getElementById('timer').textContent=fmtTime(Date.now()-T0);},250);
+  window.scrollTo(0,0);
+}
+
+function drillReveal(){
+  if(D.revealed) return;
+  D.revealed=true;
+  clearInterval(TICK);
+  var q=QS[0];
+  var ms=Date.now()-T0;
+  var ok=ANS[0]===q.answerIndex;
+  D.done++;
+  if(ok){ D.right++; D.streak++; } else { D.streak=0; }
+  document.getElementById('timer').textContent=fmtTime(ms);
+  document.getElementById('sub').textContent='刷题模式 · 已做 '+D.done+' · 对 '+D.right+(D.streak>1?' · 连对 '+D.streak:'');
+  document.getElementById('passage').innerHTML=structHtml(q, UND[0], DEL[0]);
+  document.getElementById('opts').innerHTML=optsHtml(q, ANS[0], true);
+  var box=document.createElement('div');
+  box.id='drillRes';
+  box.className='dres';
+  box.innerHTML='<div class="dres-hd">'+
+    '<span class="'+(ok?'ok':'bad')+'">'+(ok?'✓ 答对':'✗ 答错')+'</span>'+
+    '<span>用时 '+Math.round(ms/1000)+'s</span>'+
+    '<span>正确答案 '+LETTER[q.answerIndex]+'</span>'+
+    '<span class="src">'+esc(q.type)+(q.paper?' · '+esc(q.paper):'')+'</span></div>'+
+    marksHtml(q, UND[0], DEL[0])+
+    '<div class="ana">'+esc(q.analysis)+'</div>'+
+    (q.mainIndex==null
+      ? '<div class="src2">主旨句：解析未标注位置</div>'
+      : '<div class="src2">主旨句标注：'+esc(q.mainSource||'自动推断')+(q.structure?' · 结构：'+esc(q.structure):'')+' <button class="fixbtn">标注不对</button></div>');
+  document.querySelector('#quiz .card').appendChild(box);
+  var btn=document.getElementById('next');
+  btn.style.display='';
+  btn.textContent='下一题 →';
+  document.getElementById('skip').style.display='none';
+  saveOne(q, ANS[0], UND[0], DEL[0], ms);
+}
+
+function drillNext(){
+  D.i++;
+  if(D.i<D.qs.length){ drillShow(); return; }
+  document.getElementById('sub').textContent='正在换一批题…';
+  fetchQuiz(10)
+    .then(function(qs){
+      if(!qs.length){ document.getElementById('sub').textContent='没抽到题，换个题型试试'; return; }
+      D.qs=qs; D.i=0; drillShow();
+    })
+    .catch(function(e){ document.getElementById('sub').textContent='出题失败：'+e.message; });
+}
+
+function paint(){
+  var spans=document.querySelectorAll('#passage .s');
+  for(var i=0;i<spans.length;i++){
+    spans[i].classList.toggle('mark',UND[IDX]===i);
+    spans[i].classList.toggle('del',(DEL[IDX]||[]).indexOf(i)>=0);
+  }
+  var opts=document.querySelectorAll('#opts .opt');
+  for(var j=0;j<opts.length;j++) opts[j].classList.toggle('on',ANS[IDX]===j);
+  document.getElementById('cnt').textContent=ANS[IDX]==null?'未作答':'已选 '+LETTER[ANS[IDX]];
+}
+
+var down=null, lastTap=null;
+
+function isDel(i){ return (DEL[IDX]||[]).indexOf(i)>=0; }
+
+function tapMark(i){
+  if(isDel(i)){
+    var k=DEL[IDX].indexOf(i);
+    DEL[IDX].splice(k,1);
+  } else {
+    UND[IDX]=(UND[IDX]===i)?null:i;
+  }
+  paint();
+}
+
+function tapDel(i){
+  if(isDel(i)){
+    var k=DEL[IDX].indexOf(i);
+    DEL[IDX].splice(k,1);
+  } else {
+    DEL[IDX].push(i);
+    if(UND[IDX]===i) UND[IDX]=null;
+  }
+  paint();
+}
+
+document.getElementById('passage').addEventListener('pointerdown',function(e){
+  down={x:e.clientX,y:e.clientY};
+});
+document.getElementById('passage').addEventListener('pointerup',function(e){
+  if(!down) return;
+  var dx=Math.abs(e.clientX-down.x), dy=Math.abs(e.clientY-down.y);
+  down=null;
+  if(dx>8||dy>8) return;
+  var sp=e.target.closest?e.target.closest('.s'):null;
+  if(!sp) return;
+  if(MODE==='drill' && D.revealed) return;
+  var i=Number(sp.getAttribute('data-i'));
+  var now=Date.now();
+  var dbl=lastTap && lastTap.q===IDX && lastTap.i===i && (now-lastTap.t)<300;
+  if(dbl){
+    var wasDel=lastTap.wasDel;
+    lastTap=null;
+    if(!wasDel) tapDel(i);
+  } else {
+    lastTap={q:IDX,i:i,t:now,wasDel:isDel(i)};
+    tapMark(i);
+  }
+  document.getElementById('tip').style.opacity='0';
+});
+
+document.getElementById('opts').addEventListener('click',function(e){
+  var el=e.target.closest?e.target.closest('.opt'):null;
+  if(!el) return;
+  if(MODE==='drill' && D.revealed) return;
+  ANS[IDX]=Number(el.getAttribute('data-i'));
+  paint();
+  if(MODE==='drill') drillReveal();
+});
+
+document.getElementById('next').addEventListener('click',function(){
+  if(MODE==='drill'){ drillNext(); return; }
+  TMS[IDX]=Date.now()-T0;
+  if(IDX<QS.length-1){ IDX++; show(); }
+  else submit();
+});
+
+document.getElementById('skip').addEventListener('click',function(){
+  if(MODE!=='drill'||D.revealed) return;
+  ANS[IDX]=null;
+  paint();
+  drillReveal();
+});
+
+function submit(){
+  clearInterval(TICK);
+  document.getElementById('quiz').style.display='none';
+  var right=0, total=0, markRight=0, markWrong=0, noMark=0, delCnt=0, delHurt=0, unlabeled=0;
+  for(var i=0;i<QS.length;i++){
+    var q=QS[i];
+    total+=TMS[i];
+    if(ANS[i]===q.answerIndex) right++;
+    var dl=DEL[i]||[];
+    delCnt+=dl.length;
+    if(q.mainIndex==null){ unlabeled++; continue; }
+    if(UND[i]==null) noMark++;
+    else if(UND[i]===q.mainIndex) markRight++;
+    else markWrong++;
+    if(dl.indexOf(q.mainIndex)>=0) delHurt++;
+  }
+  var box=document.getElementById('result');
+  box.style.display='';
+  box.className='';
+  var h='<div class="card sum"><div class="big">'+right+' / '+QS.length+'</div><div class="sum-r">正确率 '+Math.round(right/QS.length*100)+'%<br>总用时 '+fmtTime(total)+' · 平均 '+Math.round(total/QS.length/1000)+' 秒/题</div></div>';
+  h+='<div class="card stats">';
+  h+='<div class="row"><span class="k">答题</span><span class="v">答对 '+right+' · 答错 '+(QS.length-right)+'</span></div>';
+  h+='<div class="row"><span class="k">主旨句</span><span class="v">划对 '+markRight+' · 划错 '+markWrong+'</span>'+(noMark?'<span class="w">'+noMark+' 题未划</span>':'')+'</div>';
+  if(unlabeled) h+='<div class="row"><span class="k">无标注</span><span class="v">'+unlabeled+' 题解析未给主旨句，不计入统计</span></div>';
+  h+='<div class="row"><span class="k">筛读</span><span class="v">划掉 '+delCnt+' 句</span>'+(delHurt?'<span class="w bad">⚠ 有 '+delHurt+' 题把主旨句划掉了</span>':'<span class="w">没有误伤主旨句</span>')+'</div>';
+  var chips='';
+  for(var c=0;c<QS.length;c++){
+    var cq=QS[c];
+    var ok=ANS[c]===cq.answerIndex;
+    var mt, mc;
+    if(cq.mainIndex==null){ mt='无标'; mc=''; }
+    else { mt=UND[c]==null?'主—':(UND[c]===cq.mainIndex?'主✓':'主✗'); mc=UND[c]==null?'':(UND[c]===cq.mainIndex?'ok':'bad'); }
+    chips+='<a class="qchip '+(ok?'ans-ok':'ans-bad')+'" href="#r'+(c+1)+'"><b class="'+(ok?'ok':'bad')+'">'+(c+1)+(ok?' ✓':' ✗')+'</b><span class="'+mc+'">'+mt+'</span></a>';
+  }
+  h+='<div class="qchips">'+chips+'</div>';
+  h+='<button id="foldBtn">折叠已划掉</button><button id="skelBtn">只看骨架</button>';
+  h+='</div>';
+  h+='<div class="card" style="padding:12px 16px"><div class="tip" style="margin:0">黄色底 = 解析标注的主旨句；蓝色下划线 = 你划的重点；删除线 = 你划掉不读的句子</div></div>';
+  for(var k=0;k<QS.length;k++) h+=reviewCard(QS[k],k,ANS[k],UND[k],DEL[k],TMS[k]);
+  h+='<div class="card" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span style="font-weight:700">再来一组</span><button id="again" class="primary">开始</button></div>';
+  box.classList.remove('skeleton','foldmode');
+  box.innerHTML=h;
+  document.getElementById('again').onclick=function(){
+    start();
+    window.scrollTo(0,0);
+  };
+  document.getElementById('foldBtn').onclick=function(){
+    var on=box.classList.toggle('foldmode');
+    this.textContent=on?'显示已划掉':'折叠已划掉';
+  };
+  document.getElementById('skelBtn').onclick=function(){
+    var on=box.classList.toggle('skeleton');
+    this.textContent=on?'显示全部句':'只看骨架';
+  };
+  window.scrollTo(0,0);
+  save(right,total);
+}
+
+function reviewCard(q,i,ans,und,del,ms){
+  var ok=ans===q.answerIndex;
+  del=del||[];
+  var p=q.sentences.map(function(s,j){
+    var cls='s'+(j===q.mainIndex?' main':'')+(j===und?' mine':'')+(del.indexOf(j)>=0?' del':'');
+    return '<span class="'+cls+'">'+esc(s)+'</span>';
+  }).join('');
+  var opts=q.options.map(function(t,j){
+    var c='opt'+(j===q.answerIndex?' correct':'')+(j===ans&&j!==q.answerIndex?' wrong':'');
+    var mk=j===q.answerIndex?'<span class="mk ok">✓ 正确答案</span>':(j===ans?'<span class="mk bad">✗ 你选的</span>':'');
+    return '<div class="'+c+'"><span class="k">'+LETTER[j]+'.</span><span>'+esc(t)+'</span>'+mk+'</div>';
+  }).join('');
+  var undLine;
+  if(q.mainIndex==null) undLine='<div class="und">本题解析未给出主旨句位置，不计入主旨句统计</div>';
+  else if(und==null) undLine='<div class="und">本题没有划线</div>';
+  else if(und===q.mainIndex) undLine='<div class="und ok">划线正确</div>';
+  else undLine='<div class="und">你划的是第 '+(und+1)+' 句，主旨句在第 '+(q.mainIndex+1)+' 句</div>';
+  var delLine='';
+  if(del.length){
+    var hurt=q.mainIndex!=null && del.indexOf(q.mainIndex)>=0;
+    delLine='<div class="und'+(hurt?'':' ok')+'">划掉 '+del.length+' 句'+(hurt?' · ⚠ 其中包含主旨句':'')+'</div>';
+  }
+  return '<div class="rev" id="r'+(i+1)+'"><div class="rev-hd">'+
+    '<span class="'+(ok?'ok':'bad')+'">'+(ok?'✓ 答对':'✗ 答错')+'</span>'+
+    '<span>第 '+(i+1)+' 题 · '+esc(q.type)+'</span>'+
+    '<span>用时 '+Math.round(ms/1000)+'s</span>'+
+    '<span class="src">'+esc(q.paper||'')+'</span></div>'+
+    structHtml(q,und,del)+
+    '<div class="stem">'+esc(q.stem)+'</div>'+
+    '<div class="opts">'+opts+'</div>'+
+    undLine+delLine+
+    '<div class="ana">'+esc(q.analysis)+'</div>'+
+    (q.mainIndex==null
+      ? '<div class="src2">主旨句：解析未标注位置</div>'
+      : '<div class="src2">主旨句标注：'+esc(q.mainSource||'自动推断')+(q.structure?' · 结构：'+esc(q.structure):'')+' <button class="fixbtn" data-i="'+i+'">标注不对</button></div>')+
+    '</div>';
+}
+
+function typeOptions(){
+  var ts=['all','主旨概括','意图判断','标题填入'];
+  return ts.map(function(t){
+    return '<option value="'+t+'"'+(t===TYPE?' selected':'')+'>'+(t==='all'?'全部题型':t)+'</option>';
+  }).join('');
+}
+
+function pushAttempt(obj){
+  try{
+    var k='kg-attempts';
+    var arr=JSON.parse(localStorage.getItem(k)||'[]');
+    arr.push(obj);
+    if(arr.length>3000) arr=arr.slice(-3000);
+    localStorage.setItem(k,JSON.stringify(arr));
+  }catch(e){}
+}
+
+function save(right,total){
+  pushAttempt({ts:Date.now(),right:right,n:QS.length,ms:total,
+    items:QS.map(function(q,i){return {id:q.id,type:q.type,ans:ANS[i],correct:ANS[i]===q.answerIndex,und:UND[i],del:DEL[i],main:q.mainIndex,ms:TMS[i]};})});
+}
+
+function saveOne(q,ans,und,del,ms){
+  pushAttempt({ts:Date.now(),right:ans===q.answerIndex?1:0,n:1,ms:ms,
+    items:[{id:q.id,type:q.type,ans:ans,correct:ans===q.answerIndex,und:und,del:del,main:q.mainIndex,ms:ms}]});
+}
+
+document.addEventListener('click',function(e){
+  var b=e.target.closest?e.target.closest('.fixbtn'):null;
+  if(!b) return;
+  var rev=b.closest('.rev');
+  if(rev){
+    var spans=rev.querySelectorAll('.passage .s.main, .struct .s.main');
+    for(var i=0;i<spans.length;i++) spans[i].classList.remove('main');
+    var mr=rev.querySelectorAll('.srow.smain');
+    for(var k=0;k<mr.length;k++){
+      mr[k].classList.remove('smain');
+      var tg=mr[k].querySelector('.tag');
+      if(tg){ tg.className='tag t-note'; tg.textContent='无标注'; }
+    }
+    var u=rev.querySelector('.und'); if(u) u.style.display='none';
+  } else {
+    var sp=document.querySelectorAll('#passage .s.main');
+    for(var j=0;j<sp.length;j++) sp[j].classList.remove('main');
+    var mr2=document.querySelectorAll('#passage .srow.smain');
+    for(var k2=0;k2<mr2.length;k2++){
+      mr2[k2].classList.remove('smain');
+      var tg2=mr2[k2].querySelector('.tag');
+      if(tg2){ tg2.className='tag t-note'; tg2.textContent='无标注'; }
+    }
+    var u2=document.querySelector('#drillRes .und'); if(u2) u2.style.display='none';
+  }
+  b.textContent='已忽略本题标注';
+  b.disabled=true;
+});
+
+document.getElementById('modeSeg').addEventListener('click',function(e){
+  var b=e.target.closest?e.target.closest('.sg'):null;
+  if(!b) return;
+  var m=b.getAttribute('data-mode');
+  if(m===MODE) return;
+  MODE=m;
+  try{ localStorage.setItem('pm',m); }catch(err){}
+  var all=document.querySelectorAll('#modeSeg .sg');
+  for(var i=0;i<all.length;i++) all[i].classList.toggle('on',all[i].getAttribute('data-mode')===m);
+  clearInterval(TICK);
+  if(m==='drill') drillStart(); else start();
+});
+
+document.getElementById('typeSel').addEventListener('change',function(){
+  TYPE=this.value;
+  try{ localStorage.setItem('pt',TYPE); }catch(err){}
+  clearInterval(TICK);
+  if(MODE==='drill') drillStart(); else start();
+});
+
+document.getElementById('scopeSel').addEventListener('change',function(){
+  SCOPE=this.value;
+  try{ localStorage.setItem('ps',SCOPE); }catch(err){}
+  SEEN={};
+  clearInterval(TICK);
+  if(MODE==='drill') drillStart(); else start();
+});
+
+(function(){
+  try{
+    var pm=localStorage.getItem('pm');
+    if(pm==='drill'||pm==='exam') MODE=pm;
+    var pt=localStorage.getItem('pt');
+    if(pt) TYPE=pt;
+    var ps=localStorage.getItem('ps');
+    if(ps==='all'||ps==='main') SCOPE=ps;
+  }catch(e){}
+  document.getElementById('typeSel').value=TYPE;
+  document.getElementById('scopeSel').value=SCOPE;
+  var all=document.querySelectorAll('#modeSeg .sg');
+  for(var i=0;i<all.length;i++) all[i].classList.toggle('on',all[i].getAttribute('data-mode')===MODE);
+  if(MODE==='drill') drillStart(); else start();
+})();
+</script>
+</body></html>
