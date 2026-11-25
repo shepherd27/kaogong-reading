@@ -94,8 +94,11 @@ button:disabled{opacity:.5;cursor:default}
 .t-par{background:rgba(57,197,207,.16);color:#56d4dd}
 .t-def{background:rgba(76,141,255,.16);color:#79b0ff}
 .t-note{background:rgba(139,152,169,.14);color:#9aa4b2}
+.t-view{background:rgba(88,166,255,.16);color:#79c0ff}
+.t-data{background:rgba(110,118,129,.2);color:#9aa4b2}
+.ai-badge{display:inline-block;padding:1px 6px;border-radius:5px;font-size:10.5px;font-weight:700;color:#0d1117;background:linear-gradient(135deg,#79c0ff,#56d364);letter-spacing:.3px}
 #result.foldmode .srow.hasdel{display:none}
-#result.skeleton .srow[data-role="背景"],#result.skeleton .srow[data-role="说明"],#result.skeleton .srow[data-role="举例"],#result.skeleton .srow[data-role="补充"],#result.skeleton .srow[data-role="定义"],#result.skeleton .srow[data-role="引用"]{display:none}
+#result.skeleton .srow[data-role="背景"],#result.skeleton .srow[data-role="说明"],#result.skeleton .srow[data-role="举例"],#result.skeleton .srow[data-role="补充"],#result.skeleton .srow[data-role="定义"],#result.skeleton .srow[data-role="引用"],#result.skeleton .srow[data-role="数据"]{display:none}
 .und{margin-top:12px;font-size:12.5px;color:var(--warn)}
 .und.ok{color:var(--ok)}
 .ana{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);color:var(--sub);font-size:13.5px;line-height:1.9;white-space:pre-wrap}
@@ -137,8 +140,9 @@ select{background:var(--panel);border:1px solid var(--line);color:var(--fg);padd
       <option value="标题填入">标题填入</option>
     </select>
     <select id="scopeSel" title="题库范围">
-      <option value="main">有主旨标注</option>
-      <option value="all">全部题目</option>
+      <option value="ai">AI 精析（200 题）</option>
+      <option value="main">有主旨标注（945 题）</option>
+      <option value="all">全部题目（1988 题）</option>
     </select>
   </div>
 
@@ -162,7 +166,7 @@ select{background:var(--panel);border:1px solid var(--line);color:var(--fg);padd
   <div id="result" style="display:none"></div>
 </div>
 <script>
-var MODE='exam', TYPE='all', SCOPE='main';
+var MODE='exam', TYPE='all', SCOPE='ai';
 var QS=[], IDX=0, ANS=[], UND=[], DEL=[], TMS=[], T0=0, TICK=null;
 var LETTER='ABCDEFGH';
 var D={qs:[],i:0,done:0,right:0,streak:0,revealed:false};
@@ -171,7 +175,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 function fmtTime(ms){var s=Math.max(0,Math.floor(ms/1000));var m=Math.floor(s/60);s=s%60;return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;}
 
 var PACKS={}, MANIFEST=null, POOL={}, SEEN={};
-var SCOPE='main';
+var SCOPE='ai';
 function loadManifest(){
   if(MANIFEST) return Promise.resolve(MANIFEST);
   return fetch('data/manifest.json').then(function(r){return r.json();}).then(function(m){MANIFEST=m;return m;});
@@ -186,12 +190,12 @@ function shuffle(a){
   return a;
 }
 function norm(q){
-  return {id:q.id,type:q.type,stem:q.stem,sentences:q.s,options:q.o,answerIndex:q.a,analysis:q.an,mainIndex:q.m,mainSource:q.src,structure:q.st,paper:q.p};
+  return {id:q.id,type:q.type,stem:q.stem,sentences:q.s,options:q.o,answerIndex:q.a,analysis:q.an,mainIndex:q.m,mainSource:q.src,structure:q.st,paper:q.p,sr:q.sr,sn:q.sn};
 }
 function loadPool(scope){
   if(POOL[scope]) return Promise.resolve(POOL[scope]);
   return loadManifest().then(function(m){
-    var tiers=scope==='all'?['main','more']:['main'];
+    var tiers=scope==='all'?['main','more']:(scope==='ai'?['ai']:['main']);
     var jobs=[];
     for(var ti=0;ti<tiers.length;ti++){
       var tier=tiers[ti];
@@ -241,8 +245,8 @@ var ROLE_RULES=[
   ['背景',/随着|近年来|长期以来|一直以来|在.{0,12}背景下|人们通常|传统上|过去/],
   ['定义',/是指|所谓|指的是/]
 ];
-var ROLE_CLS={背景:'bg',问题:'prob',转折:'turn',举例:'eg',原因:'cause',对策:'fix',结论:'conc',并列:'par',引用:'note',定义:'def',说明:'note',主旨:'main',补充:'note'};
-var ROLE_NOTE={背景:'交代背景，引出话题',问题:'指出问题或不足',转折:'转折，引出重点',举例:'举例论证',原因:'分析原因',对策:'提出对策',结论:'得出结论',并列:'并列展开',引用:'引用观点或数据',定义:'解释概念',说明:'具体说明',补充:'补充说明',主旨:'本段主旨所在'};
+var ROLE_CLS={背景:'bg',问题:'prob',转折:'turn',举例:'eg',原因:'cause',对策:'fix',结论:'conc',并列:'par',引用:'note',定义:'def',说明:'note',主旨:'main',补充:'note',观点:'view',递进:'par',数据:'data'};
+var ROLE_NOTE={背景:'交代背景，引出话题',问题:'指出问题或不足',转折:'转折，引出重点',举例:'举例论证',原因:'分析原因',对策:'提出对策',结论:'得出结论',并列:'并列展开',引用:'引用观点或数据',定义:'解释概念',说明:'具体说明',补充:'补充说明',主旨:'本段主旨所在',观点:'提出观点',递进:'递进展开',数据:'数据支撑'};
 var CN_NUM2={'一':0,'二':1,'三':2,'四':3,'五':4,'六':5,'七':6,'八':7,'九':8,'十':9};
 
 function roleOf(s){
@@ -299,20 +303,21 @@ function mainNote(a){
 function structHtml(q,und,del){
   del=del||[];
   var n=q.sentences.length;
-  var notes=analysisNotes(q.analysis||'',n);
+  var ai=Array.isArray(q.sr)&&Array.isArray(q.sn)&&q.sr.length===n&&q.sn.length===n;
+  var notes=ai?q.sn:analysisNotes(q.analysis||'',n);
   var roles=[];
-  for(var i=0;i<n;i++) roles.push(roleOfSentence(q,i,notes[i]));
+  for(var i=0;i<n;i++) roles.push(i===q.mainIndex?'主旨':(ai?q.sr[i]:roleOfSentence(q,i,notes[i])));
   var rows='';
   for(var j=0;j<n;j++){
     var isMain=j===q.mainIndex;
     var cls='s'+(isMain?' main':'')+(j===und?' mine':'')+(del.indexOf(j)>=0?' del':'');
-    var note=(isMain?mainNote(q.analysis):'')||notes[j]||ROLE_NOTE[roles[j]]||'';
+    var note=ai?(notes[j]||ROLE_NOTE[roles[j]]||''):((isMain?mainNote(q.analysis):'')||notes[j]||ROLE_NOTE[roles[j]]||'');
     rows+='<div class="srow'+(isMain?' smain':'')+(del.indexOf(j)>=0?' hasdel':'')+'" data-role="'+roles[j]+'">'+
       '<div class="stxt"><span class="'+cls+'" data-i="'+j+'">'+esc(q.sentences[j])+'</span></div>'+
       '<div class="sann"><span class="tag t-'+ROLE_CLS[roles[j]]+'">'+roles[j]+'</span>'+(note?'<span class="snote">'+esc(note)+'</span>':'')+'</div>'+
       '</div>';
   }
-  return '<div class="struct"><div class="struct-hd"><span>逐句结构</span><span class="struct-sum">'+esc(roles.join(' → '))+'</span>'+(q.structure?'<span class="struct-st">结构：'+esc(q.structure)+'</span>':'')+'</div>'+rows+'</div>';
+  return '<div class="struct"><div class="struct-hd"><span>逐句结构</span>'+(ai?'<span class="ai-badge">AI 精析</span>':'')+'<span class="struct-sum">'+esc(roles.join(' → '))+'</span>'+(q.structure?'<span class="struct-st">结构：'+esc(q.structure)+'</span>':'')+'</div>'+rows+'</div>';
 }
 
 function marksHtml(q, und, del){
@@ -738,7 +743,7 @@ document.getElementById('scopeSel').addEventListener('change',function(){
     var pt=localStorage.getItem('pt');
     if(pt) TYPE=pt;
     var ps=localStorage.getItem('ps');
-    if(ps==='all'||ps==='main') SCOPE=ps;
+    if(ps==='all'||ps==='main'||ps==='ai') SCOPE=ps;
   }catch(e){}
   document.getElementById('typeSel').value=TYPE;
   document.getElementById('scopeSel').value=SCOPE;
