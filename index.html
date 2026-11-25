@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://shepherd27.github.io" crossorigin>
 <meta name="theme-color" content="#0d1016">
 <meta name="description" content="公务员行测片段阅读训练：逐句结构拆解、主旨句划线、错题本与答题统计。">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -338,14 +340,20 @@ function dbOpen(){
     var r=indexedDB.open('kg-cache-v1',1);
     r.onupgradeneeded=function(){ if(!r.result.objectStoreNames.contains('packs')) r.result.createObjectStore('packs'); };
     r.onsuccess=function(){ DB=r.result; res(DB); };
-    r.onerror=function(){ rej(r.error); };
+    r.onerror=function(){ rej(r.error||new Error('idb error')); };
+    r.onblocked=function(){ rej(new Error('idb blocked')); };
   });
 }
 function idbGet(k){
-  return dbOpen().then(function(db){return new Promise(function(res){
-    var tx=db.transaction('packs','readonly').objectStore('packs').get(k);
-    tx.onsuccess=function(){res(tx.result||null);}; tx.onerror=function(){res(null);};
-  });}).catch(function(){return null;});
+  return new Promise(function(res){
+    var done=false, to=setTimeout(function(){ if(!done){done=true;res(null);} },1600);
+    dbOpen().then(function(db){
+      if(done) return;
+      var tx=db.transaction('packs','readonly').objectStore('packs').get(k);
+      tx.onsuccess=function(){ if(done)return; done=true; clearTimeout(to); res(tx.result||null); };
+      tx.onerror=function(){ if(done)return; done=true; clearTimeout(to); res(null); };
+    }).catch(function(){ if(done)return; done=true; clearTimeout(to); res(null); });
+  });
 }
 function idbPut(k,v){
   dbOpen().then(function(db){
@@ -355,12 +363,55 @@ function idbPut(k,v){
 }
 
 /* ============ 数据层 ============ */
+/* 多源加载：本机源多半最快，但国内手机网络访问 github.io 常常卡死，
+   所以给 6s 超时 + jsDelivr 两个镜像兜底，并记住上次成功的源 */
+var HOSTS=[
+  {id:'origin',base:''},
+  {id:'fastly',base:'https://fastly.jsdelivr.net/gh/shepherd27/kaogong-reading@main/'},
+  {id:'cdn',base:'https://cdn.jsdelivr.net/gh/shepherd27/kaogong-reading@main/'}
+];
+var K_HOST='kg-host';
+function hostOrder(){
+  var save=lsGet(K_HOST,'origin'), out=[];
+  HOSTS.forEach(function(h){ if(h.id===save) out.push(h); });
+  HOSTS.forEach(function(h){ if(h.id!==save) out.push(h); });
+  return out;
+}
+function fetchOne(url,ms){
+  return new Promise(function(res,rej){
+    var ac=window.AbortController?new AbortController():null, done=false;
+    var to=setTimeout(function(){ if(done) return; done=true; if(ac) ac.abort(); rej(new Error('超时')); },ms);
+    var opt={cache:'no-cache'}; if(ac) opt.signal=ac.signal;
+    fetch(url,opt).then(function(r){
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.text();
+    }).then(function(txt){
+      if(done) return;
+      done=true; clearTimeout(to);
+      try{ res(JSON.parse(txt)); }catch(e){ rej(new Error('JSON 解析失败')); }
+    }).catch(function(e){
+      if(done) return; done=true; clearTimeout(to); rej(e);
+    });
+  });
+}
+function dataGet(path,ms){
+  var order=hostOrder(), i=0, errs=[];
+  function step(){
+    if(i>=order.length) return Promise.reject(new Error(errs.join(' / ')||'题库加载失败'));
+    var h=order[i++], url=(h.base?h.base+path:path);
+    return fetchOne(url,ms||7000).then(function(j){
+      if(lsGet(K_HOST,'origin')!==h.id) lsSet(K_HOST,h.id);
+      return j;
+    }).catch(function(e){ errs.push(h.id+':'+e.message); return step(); });
+  }
+  return step();
+}
 function getManifest(){
   if(Man) return Promise.resolve(Man);
-  return fetch('data/manifest.json',{cache:'no-cache'}).then(function(r){
-    if(!r.ok) throw new Error('manifest HTTP '+r.status);
-    return r.json();
-  }).then(function(m){Man=m;fillScopes();return m;});
+  return dataGet('data/manifest.json',5000).then(function(m){
+    if(!m||!m.main) throw new Error('manifest 格式不对');
+    Man=m; fillScopes(); return m;
+  });
 }
 function packGet(t,i){
   var key=t+':'+i;
@@ -368,10 +419,7 @@ function packGet(t,i){
   var built=(Man&&Man.built)||'';
   return idbGet('p:'+key+':'+built).then(function(hit){
     if(hit){PK[key]=hit;return hit;}
-    return fetch('data/'+t+'/pack-'+i+'.json').then(function(r){
-      if(!r.ok) throw new Error('题库分片 '+key+' 加载失败');
-      return r.json();
-    }).then(function(list){
+    return dataGet('data/'+t+'/pack-'+i+'.json',9000).then(function(list){
       PK[key]=list; idbPut('p:'+key+':'+built,list); return list;
     });
   }).catch(function(e){
@@ -409,37 +457,47 @@ function norm(q){
     analysis:q.an,mainIndex:(q.m==null?null:q.m),mainSource:q.src,structure:q.st,
     paper:q.p,sr:q.sr,sn:q.sn,mconf:q.mconf||null,mprev:(q.mprev==null?null:q.mprev)};
 }
-function mapPacks(list,t,i){
+var QDIRTY=false;
+function mapPacks(list,t,i,defer){
   if(!QMAP) QMAP={};
   var changed=false;
   for(var k=0;k<list.length;k++){
     var id=list[k].id;
     if(!QMAP[id]){QMAP[id]=t+':'+i;changed=true;}
   }
-  if(changed){
-    var ks=Object.keys(QMAP);
-    if(ks.length>5000){var keep={};ks.slice(-4500).forEach(function(k){keep[k]=QMAP[k];});QMAP=keep;}
-    lsSet(K_QMAP,QMAP);
-  }
+  if(changed){ if(defer) QDIRTY=true; else flushQMap(); }
+}
+function flushQMap(){
+  if(!QMAP||!QDIRTY) return; QDIRTY=false;
+  var ks=Object.keys(QMAP);
+  if(ks.length>5000){var keep={};ks.slice(-4500).forEach(function(k){keep[k]=QMAP[k];});QMAP=keep;}
+  lsSet(K_QMAP,QMAP);
 }
 async function pickFresh(n,filter){
-  var q=packQueue(), got=[], loads=0, maxLoads=Math.min(filter?6:4,q.length);
-  while(q.length && loads<maxLoads && got.length<n){
-    var p=q.shift(); loads++;
-    setLoad(true,loads+'/'+maxLoads);
-    try{
-      var list=await packGet(p.t,p.i);
-      mapPacks(list,p.t,p.i);
-      for(var k=0;k<list.length;k++){
-        var it=list[k];
-        if(!matchType(it)) continue;
-        if(SEEN.has(it.id)) continue;
-        if(filter && !filter(it)) continue;
-        got.push(it);
-      }
-    }catch(e){ /* 单个分片失败继续 */ }
-  }
+  var q=packQueue(), maxLoads=Math.min(filter?6:4,q.length);
+  var batch=q.slice(0,maxLoads), lists=new Array(batch.length), done=0, got=[];
+  if(batch.length) setLoad(true,'0/'+batch.length);
+  await Promise.all(batch.map(function(p,bi){
+    return packGet(p.t,p.i).then(function(list){
+      lists[bi]=list; done++; setLoad(true,done+'/'+batch.length);
+      mapPacks(list,p.t,p.i,true);
+    }).catch(function(){});
+  }));
+  flushQMap();
   setLoad(false);
+  if(batch.length && !lists.some(Boolean)) throw new Error('题库下载失败（网络不通或太慢），点重试');
+  for(var bi=0;bi<lists.length;bi++){
+    var list=lists[bi]; if(!list) continue;
+    for(var k=0;k<list.length;k++){
+      var it=list[k];
+      if(!matchType(it)) continue;
+      if(SEEN.has(it.id)) continue;
+      if(filter && !filter(it)) continue;
+      got.push(it);
+      if(got.length>=n*3) break;
+    }
+    if(got.length>=n*3) break;
+  }
   return shuffle(got).slice(0,n).map(norm);
 }
 async function getQuiz(n,filter){
