@@ -177,11 +177,14 @@ html[data-theme="paper"] .t-data{color:#545a62}
 .wbtn.on{border-color:var(--acc);background:var(--acc);color:#0d1117;font-weight:600}
 .why-adv{margin-top:8px;font-size:12px;color:var(--acc);line-height:1.8}
 /* ---- 回到题干 ---- */
-.fab{position:fixed;right:16px;bottom:96px;z-index:50;padding:9px 14px;border-radius:22px;border:1px solid var(--acc);
+.fab{position:fixed;right:16px;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:50;padding:9px 14px;border-radius:22px;border:1px solid var(--acc);
   background:var(--panel);color:var(--fg);font-size:12.5px;box-shadow:0 6px 20px rgba(0,0,0,.28);cursor:pointer;opacity:.94}
 .fab:hover{background:var(--acc);color:#0d1117}
 .tostem{background:transparent;border:1px solid var(--line);color:var(--sub);font-size:11px;padding:2px 8px;border-radius:6px;cursor:pointer;margin-left:auto}
 .tostem:hover{border-color:var(--acc);color:var(--fg)}
+.revnav{display:flex;gap:8px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.revnav button{flex:1;min-height:40px;font-size:13px;padding:8px 10px}
+.revnav button:disabled{opacity:.32}
 
 /* ---- stats ---- */
 .statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0}
@@ -212,6 +215,9 @@ html[data-theme="paper"] .t-data{color:#545a62}
   .wrap{padding:14px 13px 132px}
   h1{font-size:16.5px}
   .big{font-size:30px}
+  .icon-btn{width:40px;height:40px;font-size:16px}
+  .sg{padding:9px 13px}
+  .opt{padding:12px 13px;font-size:15px}
   .srow{grid-template-columns:1fr;gap:2px;padding:8px 0}
   .sann{margin-top:2px;padding-left:10px;font-size:11.5px}
   .sann:before{top:1px;bottom:1px}
@@ -704,6 +710,11 @@ function backToStem(){
   if(card && card.scrollIntoView) card.scrollIntoView({behavior:'smooth',block:'start'});
   else window.scrollTo({top:0,behavior:'smooth'});
 }
+function goCard(id){
+  var t=document.getElementById(id); if(!t) return;
+  var y=t.getBoundingClientRect().top+window.scrollY-12;
+  window.scrollTo({top:y<0?0:y});
+}
 function emptyState(title,desc,btnText,fn){
   view('empty');
   $('empty').innerHTML='<div class="card"><div style="font-weight:700;margin-bottom:6px">'+esc(title)+'</div>'+
@@ -757,20 +768,17 @@ function bindCard(){
     pickOption(Number(el.getAttribute('data-i')));
   });
 }
-var down=null,tapTimer=null,tapI=-1,lastTapT=0,lastTapI=-1;
+var down=null,lastTapT=0,lastTapI=-1;
 function tapSentence(i){
-  var now=Date.now();
-  if(now-lastTapT<260 && lastTapI===i){          // 双击 → 划掉
-    clearTimeout(tapTimer); tapTimer=null; lastTapT=0; lastTapI=-1;
-    toggleDel(i); return;
+  var now=Date.now(), d=V.del[V.idx]||[];
+  if(now-lastTapT<280 && lastTapI===i){        // 双击 → 划掉
+    lastTapT=0; lastTapI=-1; toggleDel(i); return;
+  }
+  if(d.indexOf(i)>=0){                         // 已划掉 → 单击取消
+    lastTapT=0; lastTapI=-1; toggleDel(i); return;
   }
   lastTapT=now; lastTapI=i;
-  if(tapTimer){ clearTimeout(tapTimer); flushTap(); }
-  tapI=i;
-  tapTimer=setTimeout(function(){ tapTimer=null; markSentence(i); },260);
-}
-function flushTap(){
-  if(tapTimer){ clearTimeout(tapTimer); tapTimer=null; if(tapI>=0) markSentence(tapI); }
+  markSentence(i);                             // 立即高亮，不再等计时器
 }
 function markSentence(i){
   if((V.del[V.idx]||[]).indexOf(i)>=0){ toggleDel(i); return; }
@@ -1015,6 +1023,10 @@ function reviewCard(q,i,ans,und,del,ms){
     (ok?'':whyHtml(q.id))+
     '<div class="ana">'+esc(q.analysis)+'</div>'+
     (mIdx==null?'':'<div class="src2">主旨句标注：'+esc(q.mainSource||'自动推断')+(q.mconf==='rule2'?'（解析反向取位，判分给 ±1 容差）':'')+(q.structure?' · 结构：'+esc(q.structure):'')+' <button class="fixbtn">标注不对</button></div>')+
+    '<div class="revnav">'+
+      (i>0?'<button data-go="r'+i+'">← 上一题</button>':'<button disabled>← 上一题</button>')+
+      (i<V.qs.length-1?'<button data-go="r'+(i+2)+'">下一题 →</button>':'<button disabled>下一题 →</button>')+
+    '</div>'+
     '</div>';
 }
 
@@ -1244,11 +1256,9 @@ function bindUI(){
   window.addEventListener('scroll',toggleFab,{passive:true});
   document.addEventListener('click',function(e){
     var ts=e.target.closest?e.target.closest('.tostem'):null;
-    if(ts){
-      var card=document.getElementById(ts.getAttribute('data-t'));
-      if(card&&card.scrollIntoView) card.scrollIntoView({behavior:'smooth',block:'start'});
-      return;
-    }
+    if(ts){ goCard(ts.getAttribute('data-t')); return; }
+    var go=e.target.closest?e.target.closest('[data-go]'):null;
+    if(go){ goCard(go.getAttribute('data-go')); return; }
   });
   $('modeSeg').addEventListener('click',function(e){
     var b=e.target.closest?e.target.closest('.sg'):null; if(!b) return;
