@@ -429,7 +429,7 @@ function packGet(t,i){
     throw e;
   });
 }
-function tiersOf(scope){return scope==='all'?['main','more']:(scope==='main'?['main']:['ai']);}
+function tiersOf(scope){return scope==='all'?['main','more','pure']:(scope==='main'?['main']:(scope==='pure'?['pure']:['ai']));}
 function packQueue(){
   var q=[],tiers=tiersOf(S.scope);
   for(var ti=0;ti<tiers.length;ti++){
@@ -440,11 +440,12 @@ function packQueue(){
 }
 function fillScopes(){
   if(!Man) return;
-  var ai=(Man.ai&&Man.ai.total)||0, main=(Man.main&&Man.main.total)||0, more=(Man.more&&Man.more.total)||0;
+  var ai=(Man.ai&&Man.ai.total)||0, main=(Man.main&&Man.main.total)||0, more=(Man.more&&Man.more.total)||0, pure=(Man.pure&&Man.pure.total)||0;
   var o=$('scopeSel');
   o.innerHTML='<option value="ai">AI 精析（'+ai+' 题）</option>'+
     '<option value="main">有主旨标注（'+main+' 题）</option>'+
-    '<option value="all">全部题目（'+(main+more)+' 题）</option>';
+    '<option value="pure">事业单位真题·片段阅读（'+pure+' 题）</option>'+
+    '<option value="all">全部题目（'+(main+more+pure)+' 题）</option>';
   o.value=S.scope;
   o.disabled=(S.mode==='bank'||S.mode==='wrong');
 }
@@ -613,6 +614,7 @@ function structHtml(q,und,del){
     var isMain=j===mIdx;
     var cls='s'+(isMain?' main':'')+(j===und?' mine':'')+(del.indexOf(j)>=0?' del':'');
     var note=ai?(notes[j]||ROLE_NOTE[roles[j]]||''):((isMain?mainNote(q.analysis):'')||notes[j]||ROLE_NOTE[roles[j]]||'');
+    if(!ai&&note&&note.indexOf(roles[j])===0) note=note.slice(roles[j].length).replace(/^[，,、：:]/,'');
     rows+='<div class="srow'+(isMain?' smain':'')+(del.indexOf(j)>=0?' hasdel':'')+'" data-role="'+roles[j]+'">'+
       '<div class="stxt"><span class="'+cls+'" data-i="'+j+'">'+esc(q.sentences[j])+'</span></div>'+
       '<div class="sann"><span class="tag t-'+ROLE_CLS[roles[j]]+'">'+roles[j]+'</span>'+(note?'<span class="snote">'+esc(note)+'</span>':'')+
