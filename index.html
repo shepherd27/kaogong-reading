@@ -27,7 +27,7 @@ html,body{overflow-x:hidden}
 body{margin:0;min-height:100dvh;background:var(--bg);color:var(--fg);
   font:15px/1.65 -apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
   -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
-.wrap{max-width:740px;margin:0 auto;padding:18px 16px 132px}
+.wrap{max-width:860px;margin:0 auto;padding:18px 16px 132px}
 
 /* ---- header ---- */
 .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
@@ -123,10 +123,11 @@ button:disabled{opacity:.45;cursor:default}
 .struct{margin-top:2px}
 .struct-hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--sub);margin-bottom:4px}
 .struct-sum{color:var(--acc);font-weight:600;letter-spacing:.4px}
-.srow{display:grid;grid-template-columns:minmax(0,1fr) 206px;gap:14px;padding:9px 0;border-top:1px dashed var(--line)}
+.srow{display:grid;grid-template-columns:minmax(0,1fr) 238px;gap:14px;padding:9px 0;border-top:1px dashed var(--line)}
 .srow:first-of-type{border-top:0}
 .stxt{font-size:var(--pf);line-height:calc(var(--pl) * .95);text-align:justify}
 .sann{position:relative;padding-left:12px;font-size:12px;line-height:1.6;color:var(--sub);align-self:start;margin-top:5px}
+.sann .swy{display:block;margin-top:3px;font-size:11px;line-height:1.55;color:var(--sub);opacity:.72}
 .sann:before{content:'';position:absolute;left:0;top:3px;bottom:3px;width:2px;border-radius:2px;background:var(--line)}
 .sann:after{content:'';position:absolute;left:-14px;top:9px;width:12px;height:1px;background:var(--line)}
 .srow.smain .sann:before{background:var(--warn)}
@@ -455,7 +456,7 @@ function matchType(q){return S.type==='all'||q.type===S.type;}
 function norm(q){
   return {id:q.id,type:q.type,stem:q.stem,sentences:q.s,options:q.o,answerIndex:q.a,
     analysis:q.an,mainIndex:(q.m==null?null:q.m),mainSource:q.src,structure:q.st,
-    paper:q.p,sr:q.sr,sn:q.sn,mconf:q.mconf||null,mprev:(q.mprev==null?null:q.mprev)};
+    paper:q.p,sr:q.sr,sn:q.sn,sv:q.sv,mconf:q.mconf||null,mprev:(q.mprev==null?null:q.mprev)};
 }
 var QDIRTY=false;
 function mapPacks(list,t,i,defer){
@@ -601,10 +602,11 @@ function structHtml(q,und,del){
     var note=ai?(notes[j]||ROLE_NOTE[roles[j]]||''):((isMain?mainNote(q.analysis):'')||notes[j]||ROLE_NOTE[roles[j]]||'');
     rows+='<div class="srow'+(isMain?' smain':'')+(del.indexOf(j)>=0?' hasdel':'')+'" data-role="'+roles[j]+'">'+
       '<div class="stxt"><span class="'+cls+'" data-i="'+j+'">'+esc(q.sentences[j])+'</span></div>'+
-      '<div class="sann"><span class="tag t-'+ROLE_CLS[roles[j]]+'">'+roles[j]+'</span>'+(note?'<span class="snote">'+esc(note)+'</span>':'')+'</div>'+
+      '<div class="sann"><span class="tag t-'+ROLE_CLS[roles[j]]+'">'+roles[j]+'</span>'+(note?'<span class="snote">'+esc(note)+'</span>':'')+
+        ((q.sv&&q.sv[j])?'<span class="swy">为什么：'+esc(q.sv[j])+'</span>':'')+'</div>'+
       '</div>';
   }
-  return '<div class="struct"><div class="struct-hd"><span>逐句结构</span>'+(ai?'<span class="ai-badge">AI 精析</span>':'')+
+  return '<div class="struct"><div class="struct-hd"><span>逐句结构</span>'+(ai?'<span class="ai-badge">'+(String(q.mainSource||'').indexOf('模型逐句精析')>=0?'逐句精判':'逐句推演')+'</span>':'')+
     '<span class="struct-sum">'+esc(roles.join(' → '))+'</span>'+(q.structure?'<span>结构：'+esc(q.structure)+'</span>':'')+'</div>'+rows+'</div>';
 }
 function mainIdxOf(q){ return (q.mconf==='low')?null:q.mainIndex; }
