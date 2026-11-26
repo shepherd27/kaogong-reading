@@ -876,7 +876,7 @@ function showExamQ(){
   $('progress').textContent=(V.idx+1)+' / '+V.qs.length;
   $('sub').textContent='考场模式 · 连续排版 · 交卷后统一解析';
   renderQuestion(); paint();
-  $('skip').hidden=true; $('next').hidden=false;
+  $('skip').hidden=true; $('next').hidden=false; $('next').disabled=false;
   $('next').textContent=(V.idx===V.qs.length-1)?'交卷':'下一题';
   startTimer(); window.scrollTo(0,0);
   saveSession();
@@ -937,7 +937,7 @@ function deepShow(){
   var old=$('drillRes'); if(old) old.parentNode.removeChild(old);
   V.revealed=false;
   renderQuestion(); paint();
-  $('skip').hidden=false; $('next').hidden=true;
+  $('skip').hidden=false; $('next').hidden=true; $('next').disabled=false;
   var tip=$('tip'); if(tip) tip.style.opacity='1';
   startTimer(); window.scrollTo(0,0);
 }
@@ -964,7 +964,7 @@ function deepReveal(){
     (mIdx==null?'':'<div class="src2">主旨句标注：'+esc(q.mainSource||'自动推断')+(q.mconf==='rule2'?'（解析反向取位，判分给 ±1 容差）':'')+(q.structure?' · 结构：'+esc(q.structure):'')+' <button class="fixbtn">标注不对</button></div>');
   document.querySelector('#quiz .card').appendChild(box);
   var tip=$('tip'); if(tip) tip.style.opacity='0';
-  $('next').hidden=false; $('next').textContent='下一题 →'; $('skip').hidden=true;
+  $('next').hidden=false; $('next').textContent='下一题 →'; $('next').disabled=false; $('skip').hidden=true;
   saveOne(q,V.ans[0],V.und[0],V.del[0],ms);
 }
 function deepNext(){
@@ -1079,7 +1079,7 @@ function bankNext(){
   if(bankDrawPending) return;
   bankDrawPending=true;
   $('sub').textContent='正在抽下一题…';
-  bankDraw().catch(function(e){ emptyState('抽题失败',e.message||String(e),'重试'); });
+  bankDraw().catch(function(e){ bankDrawPending=false; emptyState('抽题失败',e.message||String(e),'重试'); });
 }
 
 /* ============ 错题本 ============ */
