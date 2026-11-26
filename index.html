@@ -606,7 +606,7 @@ function structHtml(q,und,del){
         ((q.sv&&q.sv[j])?'<span class="swy">为什么：'+esc(q.sv[j])+'</span>':'')+'</div>'+
       '</div>';
   }
-  return '<div class="struct"><div class="struct-hd"><span>逐句结构</span>'+(ai?'<span class="ai-badge">'+(String(q.mainSource||'').indexOf('模型逐句精析')>=0?'逐句精判':'逐句推演')+'</span>':'')+
+  return '<div class="struct"><div class="struct-hd"><span>逐句结构</span>'+(ai?'<span class="ai-badge">'+(String(q.mainSource||'').indexOf('模型逐')>=0?'逐句精判':'逐句推演')+'</span>':'')+
     '<span class="struct-sum">'+esc(roles.join(' → '))+'</span>'+(q.structure?'<span>结构：'+esc(q.structure)+'</span>':'')+'</div>'+rows+'</div>';
 }
 function mainIdxOf(q){ return (q.mconf==='low')?null:q.mainIndex; }
