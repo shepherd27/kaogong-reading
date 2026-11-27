@@ -243,10 +243,7 @@ html[data-theme="paper"] .t-data{color:#545a62}
 
   <div class="ctl">
     <div class="seg" id="modeSeg">
-      <button class="sg on" data-mode="exam">考场</button>
-      <button class="sg" data-mode="bank">题库</button>
-      <button class="sg" data-mode="drill">刷题</button>
-      <button class="sg" data-mode="wrong">错题</button>
+      <button class="sg on" data-mode="bank">题库</button>
     </div>
     <div class="ctl-r">
       <select id="typeSel" title="题型">
@@ -981,7 +978,12 @@ function wrongEnd(){
 }
 
 /* ============ 精判题库 · 随机抽题 ============ */
-var K_BSEEN='kg-bseen', K_BSTAT='kg-bstat';
+var K_BSEEN='kg-bseen', K_BSTAT='kg-bstat', K_BPTR='kg-bptr';
+function bankSeqPool(){
+  var tc=S.type==='all'?'':typeCode(S.type), out=[], list=(BIDX&&BIDX.list)||[];
+  for(var i=0;i<list.length;i++){ if(tc && list[i].k!==tc) continue; out.push(list[i]); }
+  return out;
+}
 var BIDX=null, BSEEN=new Set(), BSTAT={done:0,right:0};
 function typeCode(t){return {'主旨概括':'主','意图判断':'意','标题填入':'标'}[t]||'';}
 function bankIndex(){
@@ -1013,30 +1015,30 @@ function bankStart(){
   }).catch(function(e){ emptyState('题库打开失败',e.message||String(e),'重试'); });
 }
 function bankDraw(){
-  var pool=bankPool();
-  if(!pool.length){                       // 本题型做完了 → 开新一轮
-    BSEEN=new Set(); bankSaveSeen(); pool=bankPool();
-    if(!pool.length) return Promise.reject(new Error('这个题型暂时没有精判题，换个题型'));
-  }
-  var e=pool[Math.floor(Math.random()*pool.length)];
-  setLoad(true,'1/1');
+  var pool=bankSeqPool();
+  if(!pool.length) return Promise.reject(new Error('这个题型暂时没有精判题，换个题型'));
+  var key=K_BPTR+':'+S.type;
+  var ptr=Number(lsGet(key,0))||0;
+  if(ptr<0||ptr>=pool.length){ ptr=0; lsSet(key,0); }
+  var e=pool[ptr];
+  setLoad(true,(ptr+1)+'/'+pool.length);
   return packGet(e.t,e.p).then(function(list){
     mapPacks(list,e.t,e.p);
     setLoad(false);
     var raw=null;
     for(var k=0;k<list.length;k++) if(String(list[k].id)===String(e.i)){raw=list[k];break;}
     if(!raw) throw new Error('题目定位失败，刷新后再试');
-    if(BSEEN.has(String(e.i))) return bankDraw();
-    BSEEN.add(String(e.i)); bankSaveSeen();
-    bankShow(norm(raw));
+    BPTR_CUR=ptr; lsSet(key,ptr);
+    bankShow(norm(raw),ptr,pool.length);
   }).catch(function(err){ setLoad(false); throw err; });
 }
-function bankShow(q){
+var BPTR_CUR=0;
+function bankShow(q,pos,len){
   V={qs:[q],idx:0,ans:[null],und:[null],del:[[]],tms:[0],revealed:false};
   $('dock').hidden=false;
-  var total=(BIDX&&BIDX.total)||0;
-  $('progress').textContent='已抽 '+Math.min(BSEEN.size,total)+' / '+total;
-  $('sub').textContent='精判题库 · 随机抽题 · 已做 '+BSTAT.done+' · 对 '+BSTAT.right+(BSTAT.done?'（'+Math.round(BSTAT.right/BSTAT.done*100)+'%）':'');
+  var total=len||(BIDX&&BIDX.total)||0;
+  $('progress').textContent='第 '+((pos||0)+1)+' / '+total;
+  $('sub').textContent='精判题库 · 顺序刷题 · 已做 '+BSTAT.done+' · 对 '+BSTAT.right+(BSTAT.done?'（'+Math.round(BSTAT.right/BSTAT.done*100)+'%）':'');
   var old=$('drillRes'); if(old) old.parentNode.removeChild(old);
   renderQuestion(); paint();
   $('skip').hidden=false; $('skip').textContent='不会，看解析';
@@ -1057,7 +1059,7 @@ function bankReveal(){
   BSTAT.done++; if(ok) BSTAT.right++; bankSaveSeen();
   scheduleUpdate(q.id,ok);
   $('timer').textContent=fmtTime(ms);
-  $('sub').textContent='精判题库 · 已做 '+BSTAT.done+' · 对 '+BSTAT.right+(BSTAT.done?'（'+Math.round(BSTAT.right/BSTAT.done*100)+'%）':'');
+  $('sub').textContent='精判题库 · 顺序刷题 · 已做 '+BSTAT.done+' · 对 '+BSTAT.right+(BSTAT.done?'（'+Math.round(BSTAT.right/BSTAT.done*100)+'%）':'');
   $('passage').innerHTML=structHtml(q,V.und[0],V.del[0]);
   $('opts').innerHTML=optsHtml(q,V.ans[0],true);
   var box=document.createElement('div');
@@ -1081,6 +1083,7 @@ function bankNext(){
   if(bankDrawPending) return;
   bankDrawPending=true;
   $('sub').textContent='正在抽下一题…';
+  lsSet(K_BPTR+':'+S.type,(BPTR_CUR||0)+1);
   bankDraw().catch(function(e){ bankDrawPending=false; emptyState('抽题失败',e.message||String(e),'重试'); });
 }
 
@@ -1427,10 +1430,7 @@ function bindKeys(){
 /* ============ 路由 ============ */
 function route(){
   $('resume').hidden=true;
-  if(S.mode==='bank') bankStart();
-  else if(S.mode==='drill') drillStart();
-  else if(S.mode==='wrong') wrongStart();
-  else examStart();
+  bankStart();
 }
 function bindUI(){
   bindSettings(); bindKeys();
@@ -1498,7 +1498,7 @@ async function boot(){
     var th=lsGet(K_TH,null); if(th==='paper'||th==='dark') S.theme=th;
     var fs=lsGet(K_FS,null); if(fs) S.fs=fs;
     var lh=lsGet(K_LH,null); if(lh) S.lh=lh;
-    var pm=lsGet(K_MODE,null); if(pm==='drill'||pm==='wrong'||pm==='exam'||pm==='bank') S.mode=pm;
+    S.mode='bank'; lsSet(K_MODE,'bank');
     var pt=lsGet(K_TYPE,null); if(pt) S.type=pt;
     var ps=lsGet(K_SCOPE,null); if(ps==='ai'||ps==='main'||ps==='all') S.scope=ps;
     SEEN=new Set(lsGet(K_SEEN,[])); QMAP=lsGet(K_QMAP,{});
@@ -1508,16 +1508,6 @@ async function boot(){
     [].forEach.call($('modeSeg').querySelectorAll('.sg'),function(x){x.classList.toggle('on',x.getAttribute('data-mode')===S.mode);});
     $('typeSel').disabled=(S.mode==='wrong'); syncScope();
     await getManifest(); syncScope();
-    var sess=lsGet(K_SESS,null);
-    if(sess && sess.qs && sess.qs.length && Date.now()-sess.ts<12*3600e3){
-      S.mode='exam'; lsSet(K_MODE,'exam'); syncScope();
-      [].forEach.call($('modeSeg').querySelectorAll('.sg'),function(x){x.classList.toggle('on',x.getAttribute('data-mode')==='exam');});
-      V={qs:sess.qs,idx:sess.idx,ans:sess.ans,und:sess.und,del:sess.del,tms:sess.tms||sess.qs.map(function(){return 0;}),revealed:false};
-      view('quiz'); $('quiz').innerHTML=CARD_HTML; bindCard(); showExamQ();
-      $('sub').textContent='已恢复上次未交卷的一组 · 可继续或重新开始';
-      showResume(sess);
-      return;
-    }
     route();
   }catch(e){
     emptyState('初始化失败',e.message||String(e),'重试');
