@@ -450,10 +450,10 @@ function syncScope(){
   var o=$('scopeSel');
   if(S.mode==='bank'){
     o.innerHTML='<option>精判题库'+(BIDX?('（'+BIDX.total+' 题）'):'')+'</option>';
-    o.disabled=true;
+    o.disabled=true; o.style.display='none';
   }else{
     fillScopes();
-    o.disabled=(S.mode==='wrong');
+    o.style.display=''; o.disabled=(S.mode==='wrong');
   }
 }
 function setLoad(on,txt){
