@@ -1014,31 +1014,44 @@ function bankStart(){
     return bankDraw();
   }).catch(function(e){ emptyState('题库打开失败',e.message||String(e),'重试'); });
 }
+var BORD=null, BPTR_CUR=0;
+function bankOrder(pool){
+  var key=K_BPTR+':ord:'+S.type, ids=[], m={};
+  for(var i=0;i<pool.length;i++){ ids.push(pool[i].i); m[String(pool[i].i)]=pool[i]; }
+  var st=lsGet(key,null), good=(st&&Array.isArray(st.ids)&&st.ids.length===ids.length&&typeof st.p==='number');
+  if(good){
+    var have={};
+    for(var a=0;a<ids.length;a++) have[String(ids[a])]=1;
+    for(var b=0;b<st.ids.length;b++){ if(!have[String(st.ids[b])]){ good=false; break; } }
+  }
+  if(!good){ st={ids:shuffle(ids.slice()),p:0}; lsSet(key,st); }
+  if(st.p<0||st.p>=st.ids.length){ st.ids=shuffle(ids.slice()); st.p=0; lsSet(key,st); }
+  return {key:key,st:st,map:m};
+}
 function bankDraw(){
   var pool=bankSeqPool();
   if(!pool.length) return Promise.reject(new Error('这个题型暂时没有精判题，换个题型'));
-  var key=K_BPTR+':'+S.type;
-  var ptr=Number(lsGet(key,0))||0;
-  if(ptr<0||ptr>=pool.length){ ptr=0; lsSet(key,0); }
-  var e=pool[ptr];
-  setLoad(true,(ptr+1)+'/'+pool.length);
+  var os=bankOrder(pool);
+  var e=os.map[String(os.st.ids[os.st.p])];
+  if(!e) return Promise.reject(new Error('题库索引过期，刷新页面再刷'));
+  BORD=os;
+  setLoad(true,(os.st.p+1)+'/'+pool.length);
   return packGet(e.t,e.p).then(function(list){
     mapPacks(list,e.t,e.p);
     setLoad(false);
     var raw=null;
     for(var k=0;k<list.length;k++) if(String(list[k].id)===String(e.i)){raw=list[k];break;}
     if(!raw) throw new Error('题目定位失败，刷新后再试');
-    BPTR_CUR=ptr; lsSet(key,ptr);
-    bankShow(norm(raw),ptr,pool.length);
+    BPTR_CUR=os.st.p;
+    bankShow(norm(raw),os.st.p,pool.length);
   }).catch(function(err){ setLoad(false); throw err; });
 }
-var BPTR_CUR=0;
 function bankShow(q,pos,len){
   V={qs:[q],idx:0,ans:[null],und:[null],del:[[]],tms:[0],revealed:false};
   $('dock').hidden=false;
   var total=len||(BIDX&&BIDX.total)||0;
   $('progress').textContent='第 '+((pos||0)+1)+' / '+total;
-  $('sub').textContent='精判题库 · 顺序刷题 · 已做 '+BSTAT.done+' · 对 '+BSTAT.right+(BSTAT.done?'（'+Math.round(BSTAT.right/BSTAT.done*100)+'%）':'');
+  $('sub').textContent='精判题库 · 随机刷题 · 已做 '+BSTAT.done+' · 对 '+BSTAT.right+(BSTAT.done?'（'+Math.round(BSTAT.right/BSTAT.done*100)+'%）':'');
   var old=$('drillRes'); if(old) old.parentNode.removeChild(old);
   renderQuestion(); paint();
   $('skip').hidden=false; $('skip').textContent='不会，看解析';
@@ -1059,7 +1072,7 @@ function bankReveal(){
   BSTAT.done++; if(ok) BSTAT.right++; bankSaveSeen();
   scheduleUpdate(q.id,ok);
   $('timer').textContent=fmtTime(ms);
-  $('sub').textContent='精判题库 · 顺序刷题 · 已做 '+BSTAT.done+' · 对 '+BSTAT.right+(BSTAT.done?'（'+Math.round(BSTAT.right/BSTAT.done*100)+'%）':'');
+  $('sub').textContent='精判题库 · 随机刷题 · 已做 '+BSTAT.done+' · 对 '+BSTAT.right+(BSTAT.done?'（'+Math.round(BSTAT.right/BSTAT.done*100)+'%）':'');
   $('passage').innerHTML=structHtml(q,V.und[0],V.del[0]);
   $('opts').innerHTML=optsHtml(q,V.ans[0],true);
   var box=document.createElement('div');
@@ -1077,13 +1090,13 @@ function bankReveal(){
   var tip=$('tip'); if(tip) tip.style.opacity='0';
   $('skip').hidden=true; $('next').hidden=false; $('next').textContent='下一题 →'; $('next').disabled=false;
   saveOne(q,V.ans[0],V.und[0],V.del[0],ms);
+  if(BORD){ BORD.st.p=(BPTR_CUR||0)+1; lsSet(BORD.key,BORD.st); }
 }
 function bankNext(){
   if(!V.revealed){ bankReveal(); return; }
   if(bankDrawPending) return;
   bankDrawPending=true;
   $('sub').textContent='正在抽下一题…';
-  lsSet(K_BPTR+':'+S.type,(BPTR_CUR||0)+1);
   bankDraw().catch(function(e){ bankDrawPending=false; emptyState('抽题失败',e.message||String(e),'重试'); });
 }
 
