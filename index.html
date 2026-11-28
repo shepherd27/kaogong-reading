@@ -131,6 +131,19 @@ button:disabled{opacity:.45;cursor:default}
 .sann:before{content:'';position:absolute;left:0;top:3px;bottom:3px;width:2px;border-radius:2px;background:var(--line)}
 .sann:after{content:'';position:absolute;left:-14px;top:9px;width:12px;height:1px;background:var(--line)}
 .srow.smain .sann:before{background:var(--warn)}
+.sww{color:var(--acc);border-bottom:1px dotted var(--acc);cursor:pointer;padding-bottom:1px}
+.swt{display:block;margin:6px 0 0 12px;font-size:11.5px;line-height:1.55;color:var(--acc);background:rgba(88,166,255,.08);border-left:2px solid var(--acc);padding:5px 8px;border-radius:0 6px 6px 0}
+.blindbtn{background:transparent;border:1px solid var(--line);color:var(--sub);font-size:11.5px;padding:3px 9px;border-radius:6px;cursor:pointer;font-family:inherit}
+.blindbtn:hover{border-color:var(--acc);color:var(--fg)}
+.struct.blind .struct-sum,.struct.blind .sann{display:none}
+.gsel{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px 0}
+.gsel button{background:transparent;border:1px solid var(--line);color:var(--sub);font-size:11.5px;padding:4px 9px;border-radius:6px;cursor:pointer;font-family:inherit}
+.gsel button:hover{border-color:var(--acc);color:var(--fg)}
+.gmark{display:block;margin:6px 0 0 0;font-size:11.5px;color:var(--sub)}
+.gmark b{font-weight:600}
+.gmark .gok{color:var(--ok);font-weight:600}
+.gmark .gno{color:var(--bad);font-weight:600}
+.blindhint{font-size:11.5px;color:var(--sub);margin:2px 0 6px 0}
 .tag{display:inline-block;padding:1px 7px;border-radius:5px;font-size:11px;font-weight:600;margin-right:6px;vertical-align:1px;white-space:nowrap}
 .t-bg{background:rgba(139,152,169,.18);color:#aab6c6}
 .t-prob{background:rgba(248,81,73,.16);color:#ff7b72}
@@ -553,6 +566,26 @@ var ROLE_RULES=[
   ['背景',/随着|近年来|长期以来|一直以来|在.{0,12}背景下|人们通常|传统上|过去/],
   ['定义',/是指|所谓|指的是/]
 ];
+/* 信号词：看到它就做这个判断，这是可迁移的那部分 */
+var SIGNALS=[
+ [/而非|而不是|并非|与此相反|恰恰相反/g,'对比：前后对立，立场在后半句，前半句是靶子'],
+ [/例如|比如|譬如|诸如|以.{0,12}为例/g,'举例：例子只是支撑，一律不当主旨，可以先跳'],
+ [/同时|此外|另外|另一方面|与此同时|进而/g,'并列：没有唯一主旨句，答案要覆盖全部并列项'],
+ [/但是|然而|不过|其实|事实上|却/g,'转折：转折之后才是必争之地，前面都是铺垫'],
+ [/因此|所以|可见|总之|综上|由此可见|这说明/g,'结论：收口句，主旨基本就在这句'],
+ [/应当|应该|必须|亟需|亟待|唯有|关键在于/g,'对策：作者开药方的句子，答案多半落在这'],
+ [/有人说|传统认为|人们通常|一直以来|长期以来/g,'靶子：先立一个反面说法，后文必反转，别当主旨'],
+ [/是指|所谓|指的是/g,'定义：解释概念，服务于下文，通常不承重'],
+ [/因为|由于|之所以/g,'原因：解释支撑，服务于结论，很少单独承重'],
+ [/研究表明|数据显示|调查显示|据统计/g,'数据：证据不是观点，别拿它当主旨']
+];
+function swHtml(s){
+  var t=esc(s);
+  for(var i=0;i<SIGNALS.length;i++){
+    t=t.replace(SIGNALS[i][0],function(m){return '<span class="sww" data-h="'+SIGNALS[i][1]+'">'+m+'</span>';});
+  }
+  return t;
+}
 var ROLE_CLS={背景:'bg',问题:'prob',转折:'turn',举例:'eg',原因:'cause',对策:'fix',结论:'conc',并列:'par',引用:'note',定义:'def',说明:'note',主旨:'main',补充:'note',观点:'view',递进:'par',数据:'data'};
 var ROLE_NOTE={背景:'交代背景，引出话题',问题:'指出问题或不足',转折:'转折，引出重点',举例:'举例论证',原因:'分析原因',对策:'提出对策',结论:'得出结论',并列:'并列展开',引用:'引用观点或数据',定义:'解释概念',说明:'具体说明',补充:'补充说明',主旨:'本段主旨所在',观点:'提出观点',递进:'递进展开',数据:'数据支撑'};
 var CN_NUM2={'一':0,'二':1,'三':2,'四':3,'五':4,'六':5,'七':6,'八':7,'九':8,'十':9};
@@ -616,14 +649,17 @@ function structHtml(q,und,del){
     var cls='s'+(isMain?' main':'')+(j===und?' mine':'')+(del.indexOf(j)>=0?' del':'');
     var note=ai?(notes[j]||ROLE_NOTE[roles[j]]||''):((isMain?mainNote(q.analysis):'')||notes[j]||ROLE_NOTE[roles[j]]||'');
     if(!ai&&note&&note.indexOf(roles[j])===0) note=note.slice(roles[j].length).replace(/^[，,、：:]/,'');
-    rows+='<div class="srow'+(isMain?' smain':'')+(del.indexOf(j)>=0?' hasdel':'')+'" data-role="'+roles[j]+'">'+
-      '<div class="stxt"><span class="'+cls+'" data-i="'+j+'">'+esc(q.sentences[j])+'</span></div>'+
+    rows+='<div class="srow'+(isMain?' smain':'')+(del.indexOf(j)>=0?' hasdel':'')+'" data-role="'+roles[j]+'" data-si="'+j+'">'+
+      '<div class="stxt"><span class="'+cls+'" data-i="'+j+'">'+swHtml(q.sentences[j])+'</span></div>'+
       '<div class="sann"><span class="tag t-'+ROLE_CLS[roles[j]]+'">'+roles[j]+'</span>'+(note?'<span class="snote">'+esc(note)+'</span>':'')+
         ((q.sv&&q.sv[j])?'<span class="swy">为什么：'+esc(q.sv[j])+'</span>':'')+'</div>'+
+      '<div class="gmark" data-gi="'+j+'"></div>'+
       '</div>';
   }
   return '<div class="struct"><div class="struct-hd"><span>逐句结构</span>'+(ai?'<span class="ai-badge">'+(String(q.mainSource||'').indexOf('模型逐')>=0?'逐句精判':'逐句推演')+'</span>':'')+
-    '<span class="struct-sum">'+esc(roles.join(' → '))+'</span>'+(q.structure?'<span>结构：'+esc(q.structure)+'</span>':'')+'</div>'+rows+'</div>';
+    '<button type="button" class="blindbtn">先自判</button>'+
+    '<span class="struct-sum">'+esc(roles.join(' → '))+'</span>'+(q.structure?'<span>结构：'+esc(q.structure)+'</span>':'')+'</div>'+
+    '<div class="blindhint" hidden>先别偷看标注：点句子，标它在这段里干什么，标完再点「揭晓对照」。</div>'+rows+'</div>';
 }
 function mainIdxOf(q){ return (q.mconf==='low')?null:q.mainIndex; }
 function hitMain(q,und){
@@ -666,6 +702,34 @@ function marksHtml(q,und,del){
     h+='<div class="und'+(hurt?'':' ok')+'">划掉 '+del.length+' 句'+(hurt?' · ⚠ 其中包含主旨句':'')+'</div>';
   }
   return h;
+}
+/* ---- 先自判：遮住标注，自己标一遍角色 ---- */
+function blindToggle(btn){
+  var st=btn.closest('.struct'); if(!st) return;
+  var on=!st.classList.contains('blind');
+  st.classList.toggle('blind',on);
+  btn.textContent=on?'揭晓对照':'先自判';
+  var hint=st.querySelector('.blindhint'); if(hint) hint.hidden=!on;
+  if(on){
+    var ms=st.querySelectorAll('.gmark');
+    for(var i=0;i<ms.length;i++){ ms[i].removeAttribute('data-g'); ms[i].textContent=''; }
+  }else{
+    blindScore(st);
+  }
+}
+function blindScore(st){
+  var rows=st.querySelectorAll('.srow');
+  var n=0, hit=0;
+  for(var i=0;i<rows.length;i++){
+    var g=rows[i].querySelector('.gmark'); if(!g) continue;
+    var guess=g.getAttribute('data-g'); if(!guess) continue;
+    var truth=rows[i].getAttribute('data-role')||'';
+    n++;
+    var ok=(guess===truth)||(guess==='说明'&&truth==='补充')||(guess==='补充'&&truth==='说明');
+    if(ok) hit++;
+    g.innerHTML='你判 <b>'+guess+'</b> · <span class="'+(ok?'gok':'gno')+'">'+(ok?'✓ 对':'✗ 实际是 '+truth)+'</span>';
+  }
+  if(n) st.querySelector('.blindhint').innerHTML='标了 '+n+' 句，对 '+hit+' 句。错的那些，就是考场上会读漏的位置。';
 }
 /* ---- 错因打标 ---- */
 var REASONS=['主旨句找错','被例子带跑','并列当成总分','选项偷换没识别','漏看转折词','没读懂（超时）'];
@@ -1095,7 +1159,7 @@ function bankReveal(){
     '<span>正确答案 '+L[q.answerIndex]+'</span>'+
     '<span class="src">'+esc(q.type)+(q.paper?' · '+esc(q.paper):'')+'</span></div>'+
     marksHtml(q,V.und[0],V.del[0])+
-    (ok?'':whyHtml(q.id))+
+    (ok?'':whyHtml(q.id)+'<div class="blindhint">这题错了：回上面点「先自判」，自己标一遍每句干什么，再对照。标错的那句就是你的读法漏洞。</div>')+
     '<div class="ana">'+esc(q.analysis)+'</div>'+
     (mIdx==null?'':'<div class="src2">主旨句标注：'+esc(q.mainSource||'')+(q.structure?' · 结构：'+esc(q.structure):'')+'</div>');
   document.querySelector('#quiz .card').appendChild(box);
@@ -1504,6 +1568,40 @@ function bindUI(){
     V.ans[0]=null; paint(); deepReveal();
   });
   document.addEventListener('click',function(e){
+    var sw=e.target.closest?e.target.closest('.sww'):null;
+    if(sw){
+      var row=sw.closest('.srow'), old=row?row.querySelector('.swt'):null;
+      if(old) old.parentNode.removeChild(old);
+      if(row){
+        var d=document.createElement('div'); d.className='swt'; d.textContent=sw.getAttribute('data-h');
+        (row.querySelector('.sann')||row).appendChild(d);
+      }
+      return;
+    }
+    var bb=e.target.closest?e.target.closest('.blindbtn'):null;
+    if(bb){ blindToggle(bb); return; }
+    var gb=e.target.closest?e.target.closest('.gsel button'):null;
+    if(gb){
+      var gr=gb.closest('.srow'), gm=gr.querySelector('.gmark');
+      gm.setAttribute('data-g',gb.getAttribute('data-g'));
+      gm.textContent='你判：'+gb.getAttribute('data-g')+'（待对照）';
+      var gs=gr.querySelector('.gsel'); if(gs) gs.parentNode.removeChild(gs);
+      return;
+    }
+    var sr=e.target.closest?e.target.closest('.srow'):null;
+    if(sr && e.target.closest('.stxt') && sr.parentNode && sr.parentNode.classList && sr.parentNode.classList.contains('blind')){
+      var pick=sr.querySelector('.gsel');
+      if(pick){ pick.parentNode.removeChild(pick); }
+      else{
+        var box=document.createElement('div'); box.className='gsel';
+        ['主旨','背景','举例','转折','对策','并列'].forEach(function(r){
+          var b2=document.createElement('button'); b2.type='button'; b2.textContent=r; b2.setAttribute('data-g',r);
+          box.appendChild(b2);
+        });
+        sr.insertBefore(box, sr.querySelector('.gmark'));
+      }
+      return;
+    }
     var wb=e.target.closest?e.target.closest('.wbtn'):null;
     if(wb){
       var wrap=wb.closest('.why'); if(!wrap) return;
