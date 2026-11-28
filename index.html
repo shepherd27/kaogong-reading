@@ -415,6 +415,7 @@ function dataGet(path,ms){
   function step(){
     if(i>=order.length) return Promise.reject(new Error(errs.join(' / ')||'题库加载失败'));
     var h=order[i++], url=(h.base?h.base+path:path);
+    url+=(url.indexOf('?')>=0?'&':'?')+'v='+Date.now();   // 绕开 CDN/浏览器缓存，保证拿到最新题库
     return fetchOne(url,ms||7000).then(function(j){
       if(lsGet(K_HOST,'origin')!==h.id) lsSet(K_HOST,h.id);
       return j;
