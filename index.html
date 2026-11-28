@@ -178,6 +178,10 @@ html[data-theme="paper"] .t-data{color:#545a62}
 .wbtn{background:transparent;border:1px solid var(--line);color:var(--sub);font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer}
 .wbtn:hover{border-color:var(--acc);color:var(--fg)}
 .wbtn.on{border-color:var(--acc);background:var(--acc);color:#0d1117;font-weight:600}
+.win{width:100%;margin-top:8px;background:var(--panel2);border:1px solid var(--line);color:var(--fg);
+  border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:inherit;outline:none}
+.win:focus{border-color:var(--acc)}
+.win-saved{font-size:11.5px;color:var(--ok);margin-top:4px}
 .why-adv{margin-top:8px;font-size:12px;color:var(--acc);line-height:1.8}
 /* ---- 回到题干 ---- */
 .fab{position:fixed;right:16px;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:50;padding:9px 14px;border-radius:22px;border:1px solid var(--acc);
@@ -315,7 +319,7 @@ html[data-theme="paper"] .t-data{color:#545a62}
 var L='ABCDEFGH';
 var K_ATT='kg-attempts', K_SEEN='kg-seen', K_QMAP='kg-qmap', K_SESS='kg-session',
     K_MODE='pm', K_TYPE='pt', K_SCOPE='ps', K_TH='kg-theme', K_FS='kg-fs', K_LH='kg-lh',
-    K_REASON='kg-reasons', K_SCHED='kg-sched', K_FOCUS='kg-focus';
+    K_REASON='kg-reasons', K_RTEXT='kg-rtext', K_SCHED='kg-sched', K_FOCUS='kg-focus';
 
 var S={mode:'exam',type:'all',scope:'ai',theme:'dark',fs:16,lh:2.0};
 var V={qs:[],idx:0,ans:[],und:[],del:[],tms:[],revealed:false};
@@ -674,11 +678,19 @@ var REASON_ADVICE=[
   '限时 40 秒/题，超时先选再复盘，别在一题上耗死。'
 ];
 function getReasons(){ return lsGet(K_REASON,{}); }
+function getRText(){ return lsGet(K_RTEXT,{}); }
+function setRText(qid,txt){
+  var all=getRText(), k=String(qid); txt=(txt||'').trim();
+  if(txt) all[k]=txt.slice(0,80); else delete all[k];
+  lsSet(K_RTEXT,all);
+  return all[k]||'';
+}
 function whyHtml(qid){
-  var cur=getReasons()[String(qid)]||[];
-  return '<div class="why" data-q="'+qid+'"><div class="why-hd">这题错在哪一步？点一下就行，可跳过</div><div class="why-btns">'+
+  var cur=getReasons()[String(qid)]||[], txt=getRText()[String(qid)]||'';
+  return '<div class="why" data-q="'+qid+'"><div class="why-hd">这题错在哪？标签只是省事的入口，点不中也直接写一句</div><div class="why-btns">'+
     REASONS.map(function(r,i){return '<button class="wbtn'+(cur.indexOf(i)>=0?' on':'')+'" data-r="'+i+'">'+r+'</button>';}).join('')+
-    '</div></div>';
+    '</div><input class="win" data-q="'+qid+'" placeholder="自己写：比如“把并列的后半段当成结论了”" value="'+esc(txt)+'">'+
+    '<div class="win-saved" id="ws'+qid+'"'+(txt?'':' hidden')+'>已记下，会算进错误画像</div></div>';
 }
 function toggleReason(qid,i){
   var all=getReasons(), k=String(qid), cur=all[k]||[];
@@ -1248,11 +1260,12 @@ function showStats(){
     var d=x.del||[]; delN+=d.length; if(d.indexOf(x.main)>=0) delHurt++;
   });
   /* 错误画像：错因 × 次数 × 最常命中的题型 */
-  var reasons=getReasons(), wrongItems=items.filter(function(x){return x.correct===false;});
-  var rc=REASONS.map(function(){return 0;}), tagged=0, rtype=REASONS.map(function(){return {};});
+  var reasons=getReasons(), rtexts=getRText(), wrongItems=items.filter(function(x){return x.correct===false;});
+  var rc=REASONS.map(function(){return 0;}), tagged=0, rtype=REASONS.map(function(){return {};}), mine=[];
   wrongItems.forEach(function(x){
-    var rr2=reasons[String(x.id)];
-    if(!rr2||!rr2.length) return;
+    var rr2=reasons[String(x.id)], tx=rtexts[String(x.id)];
+    if(tx) mine.push({id:x.id,tx:tx,type:x.type});
+    if(!rr2||!rr2.length){ if(tx) tagged++; return; }
     tagged++;
     rr2.forEach(function(i){
       if(rc[i]==null) return;
@@ -1284,11 +1297,11 @@ function showStats(){
     /* 错误画像 */
     h+='<div class="card"><div style="font-weight:700;margin-bottom:4px">错误画像</div>';
     if(!wrongItems.length){
-      h+='<div class="sub">还没有错题。做错时点一下错因，这里会告诉你最常踩的是哪个坑。</div>';
+      h+='<div class="sub">还没有错题。做错时点标签或写一句自己的说法，这里会攒出你的错因。</div>';
     }else{
       var maxc=Math.max.apply(Math,rc);
       if(!maxc){
-        h+='<div class="sub">做错 '+wrongItems.length+' 题，但都没点错因。下次做错时点一下按钮，画像才有数据。</div>';
+        h+='<div class="sub">做错 '+wrongItems.length+' 题，'+(mine.length?'已记下 '+mine.length+' 条自己的说法；再点一个标签，才能进定向练习。':'都没打标签。下次做错时点一个标签，或者直接写一句你的说法。')+'</div>';
       }else{
         REASONS.forEach(function(name,ri){
           if(!rc[ri]) return;
@@ -1298,7 +1311,14 @@ function showStats(){
         });
         var top=rc.indexOf(maxc);
         h+='<div class="why-adv">先补这个：'+REASON_ADVICE[top]+'</div>';
-        if(tagged<wrongItems.length) h+='<div class="sub" style="margin-top:6px">已归因 '+tagged+' / '+wrongItems.length+' 道错题，还有 '+(wrongItems.length-tagged)+' 道没点。</div>';
+        if(tagged<wrongItems.length) h+='<div class="sub" style="margin-top:6px">已归因 '+tagged+' / '+wrongItems.length+' 道错题，还有 '+(wrongItems.length-tagged)+' 道没记。</div>';
+      }
+      if(mine.length){
+        h+='<div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);font-weight:700">你自己写的（最近 '+Math.min(mine.length,8)+' 条）</div>';
+        mine.slice(-8).reverse().forEach(function(x){
+          h+='<div class="sub" style="margin:6px 0 0">· '+esc(x.tx)+(x.type?' <span style="opacity:.6">（'+esc(x.type)+'）</span>':'')+'</div>';
+        });
+        h+='<div class="sub" style="margin-top:6px;opacity:.7">自己的说法不进定向练习，但会跟着错题一起进复习队列。</div>';
       }
     }
     h+='</div>';
@@ -1334,7 +1354,7 @@ function saveOne(q,ans,und,del,ms){
     items:[{id:q.id,type:q.type,ans:ans,correct:ans===q.answerIndex,und:und,del:del,main:mainIdxOf(q),mc:q.mconf||null,st:q.structure||null,ms:ms}]});
 }
 function exportData(){
-  var data={attempts:lsGet(K_ATT,[]),seen:lsGet(K_SEEN,[]),reasons:getReasons(),sched:SCHED,exported:new Date().toISOString()};
+  var data={attempts:lsGet(K_ATT,[]),seen:lsGet(K_SEEN,[]),reasons:getReasons(),rtext:getRText(),sched:SCHED,exported:new Date().toISOString()};
   var blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download='kaogong-data-'+new Date().toISOString().slice(0,10)+'.json';
@@ -1362,6 +1382,11 @@ function importData(file){
       });
       lsSet(K_REASON,rs);
     }
+    if(d.rtext){
+      var rt=getRText();
+      Object.keys(d.rtext).forEach(function(k){ if(!rt[k]) rt[k]=d.rtext[k]; });
+      lsSet(K_RTEXT,rt);
+    }
     if(d.sched){
       Object.keys(d.sched).forEach(function(k){
         var inc=d.sched[k], cur=SCHED[k];
@@ -1376,7 +1401,7 @@ function importData(file){
 }
 function clearData(){
   if(!confirm('清空所有答题记录、错题本和去重进度？此操作不可恢复。')) return;
-  [K_ATT,K_SEEN,K_QMAP,K_SESS,K_REASON,K_SCHED,K_FOCUS,'kg-bseen','kg-bstat'].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});
+  [K_ATT,K_SEEN,K_QMAP,K_SESS,K_REASON,K_RTEXT,K_SCHED,K_FOCUS,'kg-bseen','kg-bstat'].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});
   SEEN=new Set(); QMAP={}; SCHED={};
   showStats();
 }
@@ -1502,6 +1527,16 @@ function bindUI(){
     var sp=rev.querySelectorAll('#passage .s.main,.struct .s.main');
     for(var i=0;i<sp.length;i++) sp[i].classList.remove('main');
     b.textContent='已忽略本题标注'; b.disabled=true;
+  });
+  document.addEventListener('change',function(e){
+    var el=e.target; if(!el||!el.classList||!el.classList.contains('win')) return;
+    var qid=el.getAttribute('data-q'), saved=setRText(qid,el.value), hint=document.getElementById('ws'+qid);
+    el.value=saved;
+    if(hint){ if(saved){ hint.hidden=false; } else { hint.hidden=true; } }
+  });
+  document.addEventListener('keydown',function(e){
+    var el=e.target; if(!el||!el.classList||!el.classList.contains('win')) return;
+    if(e.key==='Enter'){ e.preventDefault(); el.blur(); }
   });
 }
 
